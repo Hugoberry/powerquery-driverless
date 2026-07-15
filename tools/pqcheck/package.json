@@ -1,0 +1,13 @@
+{
+  "name": "pqcheck",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Syntax checker for the repo's Power Query M files, using Microsoft's powerquery-parser",
+  "license": "Apache-2.0",
+  "scripts": {
+    "check": "node check.js"
+  },
+  "dependencies": {
+    "@microsoft/powerquery-parser": "^0.19.0"
+  }
+}
