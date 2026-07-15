@@ -1,4 +1,4 @@
-// SQLiteReader.pq — read SQLite database files in pure Power Query M.
+// Read SQLite database files in pure Power Query M.
 // No ODBC, no ADO.NET provider, no Python/R, no custom connector required.
 // Paste into a blank query, or wrap as a function in your PBIX / dataflow.
 //
@@ -56,11 +56,9 @@ let
 
     //==================== file header ====================
     Magic = Text.FromBinary(Slice(bin, 0, 15), TextEncoding.Utf8),
-    _check = if Magic <> "SQLite format 3"
-             then error Error.Record("SQLiteReader", "Not a SQLite 3 database file", Magic)
-             else null,
-
-    ps0        = UInt2(16),
+    ps0   = if Magic <> "SQLite format 3"
+            then error Error.Record("SQLiteReader", "Not a SQLite 3 database file", Magic)
+            else UInt2(16),
     PageSize   = if ps0 = 1 then 65536 else ps0,
     WriteVer   = Byte(18),                       // 1 = rollback journal, 2 = WAL
     Reserved   = Byte(20),
