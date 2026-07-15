@@ -2,7 +2,7 @@
 
 **Pure Power Query M readers for binary file formats. No drivers, no installs, no admin rights.**
 
-> ⚠️ Early days. One reader so far (SQLite 3). This README is a placeholder and will grow as more land.
+> ⚠️ Early days. Three readers so far (SQLite 3, legacy Excel .xls, Excel Binary .xlsb). This README is a placeholder and will grow as more land.
 
 ## Why this exists
 
@@ -23,8 +23,10 @@ Every reader here is plain M source. You paste it into a blank query and it work
 | Format | Folder | Status |
 |---|---|---|
 | SQLite 3 (`.sqlite`, `.db`, `.db3`) | [`sqlite3/`](sqlite3/) | Working |
+| Legacy Excel (`.xls`, Excel 97-2003) | [`xls/`](xls/) | Working |
+| Excel Binary Workbook (`.xlsb`) | [`xlsb/`](xlsb/) | Working |
 
-Power BI has no native SQLite connector. The usual answer is the SQLite ODBC driver and its machine-level install. This reader parses the [SQLite file format](https://www.sqlite.org/fileformat2.html) directly — header, table b-trees, varints, record serial types, overflow pages — so there's nothing to install.
+**SQLite** — Power BI has no native SQLite connector. The usual answer is the SQLite ODBC driver and its machine-level install. This reader parses the [SQLite file format](https://www.sqlite.org/fileformat2.html) directly — header, table b-trees, varints, record serial types, overflow pages — so there's nothing to install.
 
 ```m
 let
@@ -36,6 +38,8 @@ in
 ```
 
 See [`sqlite3/README.md`](sqlite3/README.md) for setup, what's supported, and the limitations — particularly around WAL files and concurrent writes.
+
+**Legacy Excel and Excel Binary** — Power Query reads `.xls` and `.xlsb` through the Access Database Engine (ACE), which cannot be installed in cloud environments, so these files force a gateway in Power Query Online even when they already sit in SharePoint or Blob Storage. These readers parse BIFF8-in-CFB (`.xls`) and BIFF12-in-ZIP (`.xlsb`) directly. They are also more correct than the ACE path: ACE guesses column types from the first rows and nulls out mismatches, while these readers decode every cell from its record type. See [`xls/README.md`](xls/README.md) and [`xlsb/README.md`](xlsb/README.md).
 
 ## Design rules
 
