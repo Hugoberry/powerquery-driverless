@@ -31,16 +31,22 @@ function collect(target, out) {
 
 function location(error) {
   // Best-effort extraction of the offending token from lex/parse errors.
+  // Depending on the error kind the token sits in a different field, sometimes
+  // wrapped in a TokenWithColumnNumber ({ token, columnNumber }).
   const inner = error && error.innerError;
   if (!inner) return null;
-  const token =
-    inner.token ??
-    (inner.state
-      ? inner.state.lexerSnapshot.tokens[inner.state.tokenIndex]
-      : undefined);
-  if (!token) return null;
-  const pos = token.positionStart;
-  return `line ${pos.lineNumber + 1}, col ${pos.lineCodeUnit + 1}, near '${token.data}'`;
+  for (const candidate of [inner.token, inner.foundToken, inner.firstUnusedToken]) {
+    const token = candidate && (candidate.positionStart ? candidate : candidate.token);
+    if (token && token.positionStart) {
+      const pos = token.positionStart;
+      return `line ${pos.lineNumber + 1}, col ${pos.lineCodeUnit + 1}, near '${token.data}'`;
+    }
+  }
+  if (inner.graphemePosition) {
+    const pos = inner.graphemePosition;
+    return `line ${pos.lineNumber + 1}, col ${pos.lineCodeUnit + 1}`;
+  }
+  return null;
 }
 
 async function main() {
