@@ -23,6 +23,7 @@ Every reader here is plain M source. You paste it into a blank query and it work
 | Format | Folder | Status |
 |---|---|---|
 | SQLite 3 (`.sqlite`, `.db`, `.db3`) | [`sqlite3/`](sqlite3/) | Working |
+| Microsoft Access (`.mdb`, `.accdb`) | [`access/`](access/) | Working |
 
 Power BI has no native SQLite connector. The usual answer is the SQLite ODBC driver and its machine-level install. This reader parses the [SQLite file format](https://www.sqlite.org/fileformat2.html) directly — header, table b-trees, varints, record serial types, overflow pages — so there's nothing to install.
 
@@ -36,6 +37,19 @@ in
 ```
 
 See [`sqlite3/README.md`](sqlite3/README.md) for setup, what's supported, and the limitations — particularly around WAL files and concurrent writes.
+
+Access is the format where the install pain is sharpest. A native connector exists, but it is a wrapper over the ACE OLEDB provider: bitness must match on the Desktop, 64-bit ACE must be installed on the gateway, Click-to-Run Office hides its ACE copy from the gateway entirely, and cloud hosts cannot install it at all. Hence `The 'Microsoft.ACE.OLEDB.12.0' provider is not registered`. This reader parses the Jet 4 / ACE page format directly, so none of that applies.
+
+```m
+let
+    Source = File.Contents("C:\data\example.accdb"),
+    Db     = Access.Database(Source),
+    Orders = Db{[Name = "Orders"]}[Data]
+in
+    Orders
+```
+
+See [`access/README.md`](access/README.md) for what's supported and the limitations, in particular around encrypted databases (detected, not supported) and Access 97 files.
 
 ## Design rules
 
