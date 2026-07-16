@@ -24,35 +24,34 @@ let
     //==================== low-level byte access ====================
     Slice = (b as binary, offset as number, count as number) as binary =>
         if count <= 0 then #binary({})
-        else if offset = 0 then BinaryFormat.Binary(count)(b)
-        else BinaryFormat.Record([
-                Skip = BinaryFormat.Binary(offset),
-                Data = BinaryFormat.Binary(count)
-             ])(b)[Data],
+        else Binary.Range(b, offset, count),
 
-    UIntBE = (b as binary) as number =>
-        List.Accumulate(Binary.ToList(b), 0, (s, c) => s * 256 + c),
-
-    IntBE = (b as binary) as number =>            // two's complement, big-endian
-        let n = Binary.Length(b),
+    UInt16BEFormat = BinaryFormat.ByteOrder(BinaryFormat.UnsignedInteger16, ByteOrder.BigEndian),
+    UInt32BEFormat = BinaryFormat.ByteOrder(BinaryFormat.UnsignedInteger32, ByteOrder.BigEndian),
+    
+    Float64BEFormat = BinaryFormat.ByteOrder(BinaryFormat.Double, ByteOrder.BigEndian),
+    ReadByte = (b as binary, offset as number) as number => BinaryFormat.Byte(Binary.Range(b, offset, 1)),
+    UIntBE = (b as binary) as number => List.Accumulate(Binary.ToList(b), 0, (s, c) => s * 256 + c),
+    IntBE = (b as binary) as number =>
+        let
+            n = Binary.Length(b),
             u = UIntBE(b)
-        in  if u >= Number.Power(2, 8 * n - 1) then u - Number.Power(2, 8 * n) else u,
-
-    Byte  = (off as number) as number => UIntBE(Slice(bin, off, 1)),
-    UInt2 = (off as number) as number => UIntBE(Slice(bin, off, 2)),
-    UInt4 = (off as number) as number => UIntBE(Slice(bin, off, 4)),
-
-    Float64BE = (b as binary) as number =>
-        BinaryFormat.ByteOrder(BinaryFormat.Double, ByteOrder.BigEndian)(b),
-
-    // SQLite varint: 1–9 bytes, big-endian 7-bit groups; 9th byte uses all 8 bits.
-    VarintAt = (b as binary, offset as number) as record =>  // [Value, Size]
+        in
+            if u >= Number.Power(2, 8 * n - 1) then u - Number.Power(2, 8 * n)
+            else u,
+    
+    Byte = (off as number) as number => ReadByte(bin, off),
+    UInt2 = (off as number) as number => UInt16BEFormat(Binary.Range(bin, off, 2)),
+    UInt4 = (off as number) as number => UInt32BEFormat(Binary.Range(bin, off, 4)),
+    Float64BE = (b as binary) as number => Float64BEFormat(b),
+    VarintAt = (b as binary, offset as number) as record =>
         let f = (o as number, v as number, n as number) as record =>
-                let by = UIntBE(Slice(b, o, 1))
-                in  if n = 8 then [Value = v * 256 + by, Size = 9]
+                let by = ReadByte(b, o)
+                in if n = 8 then [Value = v * 256 + by, Size = 9]
                     else if by < 128 then [Value = v * 128 + by, Size = n + 1]
                     else @f(o + 1, v * 128 + (by - 128), n + 1)
-        in  f(offset, 0, 0),
+        in
+            f(offset, 0, 0),
 
     //==================== file header ====================
     Magic = Text.FromBinary(Slice(bin, 0, 15), TextEncoding.Utf8),
