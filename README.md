@@ -20,9 +20,10 @@ Every reader here is plain M source. You paste it into a blank query and it work
 
 ## What's here
 
-| Format | Folder | Status |
+| Component | Folder | Status |
 |---|---|---|
-| SQLite 3 (`.sqlite`, `.db`, `.db3`) | [`sqlite3/`](sqlite3/) | Working |
+| SQLite 3 reader (`.sqlite`, `.db`, `.db3`) | [`sqlite3/`](sqlite3/) | Working |
+| Codec oracle (Snappy, Brotli, Zstandard, LZ4) | [`codec-oracle/`](codec-oracle/) | Working |
 
 Power BI has no native SQLite connector. The usual answer is the SQLite ODBC driver and its machine-level install. This reader parses the [SQLite file format](https://www.sqlite.org/fileformat2.html) directly — header, table b-trees, varints, record serial types, overflow pages — so there's nothing to install.
 
@@ -36,6 +37,16 @@ in
 ```
 
 See [`sqlite3/README.md`](sqlite3/README.md) for setup, what's supported, and the limitations — particularly around WAL files and concurrent writes.
+
+### The codec oracle
+
+`Binary.Decompress` only implements GZip and Deflate, which would put every format that compresses its blocks with Snappy, Brotli, Zstandard or LZ4 out of reach. It turns out the engine ships those codecs anyway — `Parquet.Document` uses them — and [`codec-oracle/`](codec-oracle/) makes them callable from plain M by wrapping any compressed stream in a minimal in-memory Parquet file:
+
+```m
+Codec.Decompress(File.Contents("C:\data\block.snappy"), Compression.Snappy)
+```
+
+It behaves like the `Binary.Decompress` call that was never implemented, and it is the building block that lets readers here support formats whose internals use these codecs. See [`codec-oracle/README.md`](codec-oracle/README.md) for how it works and how to verify codec support on your host.
 
 ## Design rules
 
