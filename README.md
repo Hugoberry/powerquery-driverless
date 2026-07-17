@@ -24,6 +24,7 @@ Every reader here is plain M source. You paste it into a blank query and it work
 |---|---|---|
 | SQLite 3 reader (`.sqlite`, `.db`, `.db3`) | [`sqlite3/`](sqlite3/) | Working |
 | Codec oracle (Snappy, Brotli, Zstandard, LZ4) | [`codec-oracle/`](codec-oracle/) | Working |
+| CRC-32 (zlib, CRC-32C and friends) | [`crc32/`](crc32/) | Working |
 
 Power BI has no native SQLite connector. The usual answer is the SQLite ODBC driver and its machine-level install. This reader parses the [SQLite file format](https://www.sqlite.org/fileformat2.html) directly — header, table b-trees, varints, record serial types, overflow pages — so there's nothing to install.
 
@@ -47,6 +48,10 @@ Codec.Decompress(File.Contents("C:\data\block.snappy"), Compression.Snappy)
 ```
 
 It behaves like the `Binary.Decompress` call that was never implemented, and it is the building block that lets readers here support formats whose internals use these codecs. See [`codec-oracle/README.md`](codec-oracle/README.md) for how it works and how to verify codec support on your host.
+
+### CRC-32
+
+M has no hashing functions, so file-format checksums (gzip trailers, zip entries, PNG chunks, snappy blocks) normally go unverified. [`crc32/`](crc32/) is a table-driven `Crc32.Compute(binary, optional variant)` covering the zlib polynomial, CRC-32C (Castagnoli, with the snappy framing mask as an option) and the other common variants. See [`crc32/README.md`](crc32/README.md).
 
 ## Design rules
 
