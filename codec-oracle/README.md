@@ -11,29 +11,39 @@ The engine contains all of those codecs anyway. `Parquet.Document` uses them eve
 Paste [`Codec.Decompress.pq`](Codec.Decompress.pq) into a blank query and name the query `Codec.Decompress`. The argument convention mirrors `Binary.Decompress`:
 
 ```m
-// raw snappy stream: decompressed size is read from the stream itself
+// the decompressed size is derived from the stream itself for every codec
 Codec.Decompress(File.Contents("C:\data\block.snappy"), Compression.Snappy)
+Codec.Decompress(blob, Compression.Zstandard)
+Codec.Decompress(blob, Compression.Brotli)
 
-// brotli, zstandard and raw LZ4 need the decompressed size passed explicitly
-Codec.Decompress(blob, Compression.Zstandard, 1048576)
-
-// hadoop-framed LZ4 (8-byte big-endian size header before the block)
-Codec.Decompress(blob, Compression.LZ4, null, [LZ4Framing = "Hadoop"])
+// LZ4 raw blocks and hadoop-framed LZ4 both work; the framing is auto-detected
+Codec.Decompress(blob, Compression.LZ4)
 
 // gzip and deflate are routed straight to Binary.Decompress
 Codec.Decompress(blob, Compression.GZip)
+
+// third argument overrides the derivation, for the streams that need it
+Codec.Decompress(blob, Compression.Zstandard, 1048576)
+
+// fourth argument forces an LZ4 framing if auto-detection ever guesses wrong
+Codec.Decompress(blob, Compression.LZ4, null, [LZ4Framing = "Raw"])
 ```
 
-| Compression.Type | Wire format expected | Decompressed size |
+The wrapper has to declare the decompressed size, so `Codec.Decompress` reads it out of the stream:
+
+| Compression.Type | Wire format expected | Where the size comes from |
 |---|---|---|
-| `Compression.Snappy` | raw snappy block | derived from the preamble varint |
-| `Compression.Brotli` | raw brotli stream | pass explicitly |
-| `Compression.Zstandard` | zstd frame | pass explicitly |
-| `Compression.LZ4` (default) | LZ4 raw block | pass explicitly |
-| `Compression.LZ4` + `[LZ4Framing = "Hadoop"]` | 8-byte big-endian header + block | derived from the header |
+| `Compression.Snappy` | raw snappy block | stored: preamble varint |
+| `Compression.Brotli` | raw brotli stream | stored: first meta-block MLEN (see caveat below) |
+| `Compression.Zstandard` | zstd frame | stored: frame content size, when the frame declares it |
+| `Compression.LZ4` | LZ4 raw block or hadoop-framed, auto-detected | hadoop: stored in the header; raw: derived by a walk over the sequence tokens, no decompression |
 | `Compression.GZip` | gzip stream | not needed (native path) |
 | `Compression.Deflate` | raw deflate | not needed (native path) |
 | `Compression.None` | anything | returned unchanged |
+
+Two streams can genuinely withhold the size, and both produce a clear error asking for an explicit `uncompressedSize`: a zstd frame written without the optional content-size field (some streaming compressors), and a brotli stream the encoder split into several meta-blocks (typically inputs beyond a couple of MB; the first block's MLEN covers everything smaller). A wrong or stale size can never corrupt output: the Parquet reader checks it and the read fails loudly.
+
+LZ4 framing detection: a hadoop-framed stream carries its compressed size at bytes 4-7 big-endian, so a stream whose bytes 4-7 equal its own length minus 8 is treated as hadoop-framed (the same heuristic Arrow's hadoop-LZ4 codec uses). Pass `[LZ4Framing = "Raw"]` or `"Hadoop"` to force it in the astronomically unlikely event a raw block matches the pattern by chance.
 
 Framed container formats are not handled directly: a snappy framing-format file (`sNaPpY` magic) or an LZ4 frame is a sequence of blocks with chunk headers. Split the frame with ordinary M byte work and feed each block through `Codec.Decompress`.
 
@@ -63,18 +73,21 @@ Codec.Probe("C:\path\to\codec-oracle\test")
 
 The `A_*` fixtures are ordinary Parquet files (is the codec supported at all); the `B_*` fixtures are oracle wrappers around raw codec streams (does the arbitrary-blob path work). `B_gzip` and `B_uncompressed` are sanity controls: gzip is implemented everywhere, so if those fail the wrapper is being rejected, not the codec.
 
+The `payload.csv.*` files are raw compressed streams of the same payload, one per codec (`.snappy`, `.gz`, `.br`, `.zst`, `.lz4raw`, `.lz4hadoop`). Feed them to `Codec.Decompress` without an `uncompressedSize` argument: each call exercises that codec's size derivation end to end, and the result must equal `payload.csv` byte for byte. The exact call for each file is listed in [`test/expected.md`](test/expected.md).
+
 Status: all seven codecs confirmed working in Power BI Desktop (July 2026). Results for the Service, Excel and Dataflow Gen2 are welcome; note that `Parquet.Document` itself is not available in every host.
 
 ## Limitations
 
 - The whole stream and its decompressed form are in memory; this is a property of M, not of the wrapper.
 - Each call is a full `Parquet.Document` invocation. Negligible for file-sized payloads; if you are decompressing thousands of small blocks, measure first.
+- The raw-LZ4 size derivation scans the block token by token in interpreted M. Fast enough for ordinary blocks; for very large ones, passing `uncompressedSize` skips the scan.
 - Trailing checksums (CRC-32 in framing formats, Adler-32 in zlib) are not validated. Strip container framing before calling, as shown above.
 - `Compression.Deflate` has no Parquet codec, so `[ReturnWrapper = true]` is an error for it; the normal path serves it via `Binary.Decompress`.
 
 ## Testing
 
-[`test/make_fixtures.py`](test/make_fixtures.py) generates every fixture from scratch: a hand-rolled Parquet writer for the wrappers, real compressor output for the streams, and a byte-level mirror of the M implementation. Each wrapper is round-tripped through two independent readers (pyarrow and DuckDB) before it is accepted, and [`test/expected.md`](test/expected.md) records what each fixture proves along with sha256 hashes. Requires Python with `pyarrow`.
+[`test/make_fixtures.py`](test/make_fixtures.py) generates every fixture from scratch: a hand-rolled Parquet writer for the wrappers, real compressor output for the streams, and a byte-level mirror of the M implementation. Each wrapper is round-tripped through two independent readers (pyarrow and DuckDB) before it is accepted, and [`test/expected.md`](test/expected.md) records what each fixture proves along with sha256 hashes. [`test/size_mirror.py`](test/size_mirror.py) is a line-for-line Python mirror of the size-derivation logic, self-tested against real compressor output across sizes from empty to multi-megabyte, compressible and incompressible. Requires Python with `pyarrow`.
 
 ## Licence
 

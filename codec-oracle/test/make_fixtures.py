@@ -16,7 +16,9 @@ a .snappy file) byte-for-byte -- we never need to re-compress anything.
 
 Outputs (this folder):
   payload.csv               the plaintext payload
-  payload.csv.snappy        raw snappy stream of payload.csv (input for the M oracle demo)
+  payload.csv.<codec>       raw codec streams of payload.csv (.snappy, .gz, .br,
+                            .zst, .lz4raw, .lz4hadoop): inputs for exercising
+                            Codec.Decompress and its size derivation per codec
   A_<codec>.parquet         pyarrow-written ordinary Parquet files, one binary column
                             "payload", one row (controls: does Parquet.Document
                             support the codec at all on real-world files)
@@ -278,7 +280,26 @@ def main():
     # parquet codec 5 (LZ4) is the hadoop framing: 4B BE usize + 4B BE csize + block
     streams["lz4hadoop"] = struct.pack(">II", usize, len(streams["lz4raw"])) + streams["lz4raw"]
 
-    (FIX / "payload.csv.snappy").write_bytes(streams["snappy"])
+    # ---- raw codec streams: direct inputs for Codec.Decompress ------------
+    stream_files = {
+        "snappy": ("payload.csv.snappy", "Codec.Decompress(blob, Compression.Snappy)"),
+        "gzip": ("payload.csv.gz", "Codec.Decompress(blob, Compression.GZip)"),
+        "brotli": ("payload.csv.br", "Codec.Decompress(blob, Compression.Brotli)"),
+        "zstd": ("payload.csv.zst", "Codec.Decompress(blob, Compression.Zstandard)"),
+        "lz4raw": ("payload.csv.lz4raw", "Codec.Decompress(blob, Compression.LZ4)"),
+        "lz4hadoop": ("payload.csv.lz4hadoop",
+                      "Codec.Decompress(blob, Compression.LZ4)  // hadoop framing auto-detected"),
+    }
+    lines.append("\n## Raw codec streams\n")
+    lines.append("One compressed copy of payload.csv per codec, real compressor output. "
+                 "Feed each to Codec.Decompress WITHOUT an uncompressedSize argument: "
+                 "every one of these streams lets the size be derived, so the call "
+                 "doubles as a test of the per-codec size derivation. The result must "
+                 "equal payload.csv byte for byte.\n")
+    for name, (fname, call) in stream_files.items():
+        blob = streams[name]
+        (FIX / fname).write_bytes(blob)
+        lines.append(f"- `{fname}`: {len(blob)} bytes, sha256 {sha256(blob)}, `{call}`")
 
     # ---- A series: ordinary pyarrow-written parquet, one binary column ----
     table = pa.table({"payload": pa.array([payload], type=pa.binary())})
