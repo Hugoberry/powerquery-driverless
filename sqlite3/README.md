@@ -12,14 +12,16 @@ See the [root README](../README.md) for the wider motivation and the design rule
 
 ## Usage
 
-Paste the contents of [`SQLiteReader.pq`](SQLiteReader.pq) into a blank query and name the query `SQLite`. Power Query treats a query whose expression is a function as an invocable function.
+Paste the contents of [`Sqlite3.Database.pq`](Sqlite3.Database.pq) into a blank query and name the query `Sqlite3.Database`. Power Query treats a query whose expression is a function as an invocable function.
 
 ```m
 let
-    db = SQLite(File.Contents("C:\data\example.db"))
+    db = Sqlite3.Database(File.Contents("C:\data\example.db"))
 in
     db
 ```
+
+This function is also the shared SQLite core for the [GeoPackage](../gpkg/) and [MBTiles](../mbtiles/) readers, which expect a query with exactly this name alongside them.
 
 This returns a navigation table with one row per user table:
 
@@ -31,7 +33,7 @@ Drill into a single table:
 
 ```m
 let
-    db  = SQLite(File.Contents("C:\data\example.db")),
+    db  = Sqlite3.Database(File.Contents("C:\data\example.db")),
     tbl = db{[Name = "orders"]}[Data]
 in
     tbl
@@ -41,15 +43,23 @@ Any binary source works:
 
 ```m
 // Hosted file: refreshes in the Service with no gateway
-SQLite(Web.Contents("https://example.com/files/example.db"))
+Sqlite3.Database(Web.Contents("https://example.com/files/example.db"))
 
 // SharePoint / OneDrive
-SQLite(SharePoint.Files("https://tenant.sharepoint.com/sites/x")
-       {[Name = "example.db"]}[Content])
+Sqlite3.Database(SharePoint.Files("https://tenant.sharepoint.com/sites/x")
+                 {[Name = "example.db"]}[Content])
 
 // Folder source
-SQLite(Folder.Files("C:\data"){[Name = "example.db"]}[Content])
+Sqlite3.Database(Folder.Files("C:\data"){[Name = "example.db"]}[Content])
 ```
+
+### Options
+
+Second argument, optional record, all keys optional:
+
+| Key | Default | Effect |
+|---|---|---|
+| `MaxRows` | all | Decode at most N rows per table |
 
 ## What is supported
 
@@ -66,7 +76,7 @@ SQLite(Folder.Files("C:\data"){[Name = "example.db"]}[Content])
 
 | Limitation | Detail |
 |---|---|
-| **WAL** | Only the main database file is read. Committed transactions still sitting in the `-wal` file are **not visible** until checkpointed. The nav table carries `SQLite.WalMode` metadata (`Value.Metadata`) so you can detect WAL databases. |
+| **WAL** | Only the main database file is read. Committed transactions still sitting in the `-wal` file are **not visible** until checkpointed. The nav table carries `Sqlite3.WalMode` metadata (`Value.Metadata`) so you can detect WAL databases. |
 | **No locking** | The file is read without SQLite's locking protocol. Reading a database that is being written concurrently can yield a torn snapshot. Prefer reading a copy, a quiet-period snapshot, or a synced replica. |
 | **No SQL** | You get whole-table scans; filtering and joining happen in M afterwards. There is no predicate pushdown. |
 | **`WITHOUT ROWID` tables** | Stored as index b-trees; not implemented (such tables surface an error in their `Data` cell). |
