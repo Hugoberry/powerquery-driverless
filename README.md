@@ -23,6 +23,7 @@ Every reader here is plain M source. You paste it into a blank query and it work
 | Component | Folder | Status |
 |---|---|---|
 | SQLite 3 reader (`.sqlite`, `.db`, `.db3`) | [`sqlite3/`](sqlite3/) | Working |
+| dBASE / FoxPro reader (`.dbf` + `.fpt`/`.dbt`) | [`dbf/`](dbf/) | Working |
 | Codec oracle (Snappy, Brotli, Zstandard, LZ4) | [`codec-oracle/`](codec-oracle/) | Working |
 | CRC-32 (zlib, CRC-32C and friends) | [`crc32/`](crc32/) | Working |
 
@@ -38,6 +39,20 @@ in
 ```
 
 See [`sqlite3/README.md`](sqlite3/README.md) for setup, what's supported, and the limitations — particularly around WAL files and concurrent writes.
+
+### dBASE / FoxPro
+
+The applications built on FoxPro and dBASE never quite died; their `.dbf` files still land on shares, and the only sanctioned reader is the 32-bit Visual FoxPro ODBC/OLE DB driver from 2007. This reader parses the format directly: dBASE III through Visual FoxPro, memo sidecars (`.fpt`/`.dbt`), null flags, varchar, deleted-record flags, language-driver codepages.
+
+```m
+let
+    Source = File.Contents("C:\data\customers.dbf"),
+    Data   = Dbf.Table(Source, [Memo = File.Contents("C:\data\customers.fpt")])
+in
+    Data
+```
+
+See [`dbf/README.md`](dbf/README.md) for options, the type mapping, and limitations.
 
 ### The codec oracle
 
