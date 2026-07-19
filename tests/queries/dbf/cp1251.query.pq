@@ -1,1 +1,1 @@
-Dbf.Table(Extension.Contents("dbf.cp1251.dbf"))
+Dbf.Table(PQDriverless.Fixture("dbf.cp1251.dbf"))

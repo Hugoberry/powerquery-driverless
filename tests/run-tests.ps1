@@ -2,6 +2,9 @@
 # PQDriverless.mez with PQTest.exe (Microsoft.PowerQuery.SdkTools), timing each
 # run, and writes a pass/fail + duration report (markdown + JSON).
 #
+# PQTest.exe exit codes are not trustworthy (compare exits 0 on a failed
+# query), so pass/fail comes from the Status field of the JSON it prints.
+#
 # Semantics:
 #   tests/queries/**   compared against the committed <name>.query.pqout next
 #                      to each query. If the .pqout does not exist yet, the run
@@ -9,7 +12,7 @@
 #                      the file to lock the baseline in.
 #   tests/perf/**      never compared: any stale .pqout is deleted first, the
 #                      query is timed, and the produced output value is shown
-#                      in the report. Pass = PQTest exits 0.
+#                      in the report. Pass = query evaluated without error.
 #
 # Usage: pwsh tests/run-tests.ps1 [-PqTest <path\PQTest.exe>] [-Mez <path>]
 
@@ -30,7 +33,25 @@ if (-not $PqTest) {
 }
 if (-not (Test-Path $Mez)) { throw "$Mez not found. Run tests/build-mez.ps1 first." }
 
-New-Item (Join-Path $ReportDir "logs") -ItemType Directory -Force | Out-Null
+$LogDir = Join-Path $ReportDir "logs"
+New-Item $LogDir -ItemType Directory -Force | Out-Null
+
+# ---- sanity: does the module load, and what does it export? ----
+$infoLog = Join-Path $LogDir "_info.log"
+& $PqTest info -e $Mez -p > $infoLog 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Get-Content $infoLog | Write-Host
+    throw "PQTest info failed - the extension module did not load."
+}
+
+# ---- anonymous credential for the PQDriverless data source kind ----
+$credQuery = Join-Path $PSScriptRoot "credential.query.pq"
+$credLog   = Join-Path $LogDir "_set-credential.log"
+& $PqTest set-credential -e $Mez -q $credQuery -ak anonymous -p > $credLog 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Get-Content $credLog | Write-Host
+    throw "PQTest set-credential failed."
+}
 
 $results = @()
 
@@ -41,17 +62,26 @@ function Invoke-Query {
     if ($IsPerf -and (Test-Path $pqout)) { Remove-Item $pqout -Force }
     $hadBaseline = Test-Path $pqout
 
-    $log = Join-Path $ReportDir ("logs/" + $Query.BaseName + ".log")
+    $log = Join-Path $LogDir ($Query.BaseName + ".log")
     $sw  = [System.Diagnostics.Stopwatch]::StartNew()
-    & $PqTest compare -e $Mez -q $Query.FullName -p *> $log
-    $exit = $LASTEXITCODE
+    & $PqTest compare -e $Mez -q $Query.FullName -p > $log 2>&1
     $sw.Stop()
 
+    # PQTest prints a JSON array of test activities; trust its Status field.
+    $pqStatus = "Unparsed"
+    try {
+        $j = Get-Content $log -Raw | ConvertFrom-Json
+        $pqStatus = @($j)[0].Status
+    } catch { }
+
     $status =
-        if ($exit -ne 0)          { "FAIL" }
-        elseif ($IsPerf)          { "PASS (perf)" }
-        elseif (-not $hadBaseline){ "RECORDED" }
-        else                      { "PASS" }
+        if ($pqStatus -ne "Passed")                       { "FAIL ($pqStatus)" }
+        elseif ($IsPerf)                                  { "PASS (perf)" }
+        elseif (-not $hadBaseline) {
+            if (Test-Path $pqout)                         { "RECORDED" }
+            else                                          { "FAIL (no output recorded)" }
+        }
+        else                                              { "PASS" }
 
     $note = ""
     if ($IsPerf -and (Test-Path $pqout)) {
@@ -69,12 +99,12 @@ function Invoke-Query {
 
 foreach ($q in Get-ChildItem (Join-Path $PSScriptRoot "queries") -Recurse -Filter *.query.pq | Sort-Object FullName) {
     $r = Invoke-Query $q $false
-    Write-Host ("{0,-55} {1,-10} {2,8} ms" -f $r.Test, $r.Status, $r.DurationMs)
+    Write-Host ("{0,-55} {1,-12} {2,8} ms" -f $r.Test, $r.Status, $r.DurationMs)
     $results += $r
 }
 foreach ($q in Get-ChildItem (Join-Path $PSScriptRoot "perf/queries") -Recurse -Filter *.query.pq -ErrorAction SilentlyContinue | Sort-Object FullName) {
     $r = Invoke-Query $q $true
-    Write-Host ("{0,-55} {1,-10} {2,8} ms   {3}" -f $r.Test, $r.Status, $r.DurationMs, $r.Note)
+    Write-Host ("{0,-55} {1,-12} {2,8} ms   {3}" -f $r.Test, $r.Status, $r.DurationMs, $r.Note)
     $results += $r
 }
 
@@ -90,7 +120,7 @@ $md = [System.Text.StringBuilder]::new()
 foreach ($r in $results) {
     [void]$md.AppendLine("| $($r.Test) | $($r.Status) | $($r.DurationMs) | $($r.Note) |")
 }
-$fails    = @($results | Where-Object Status -eq "FAIL")
+$fails    = @($results | Where-Object { $_.Status -like "FAIL*" })
 $recorded = @($results | Where-Object Status -eq "RECORDED")
 [void]$md.AppendLine("")
 [void]$md.AppendLine("$($results.Count) tests, $($fails.Count) failed, $($recorded.Count) newly recorded.")

@@ -1,5 +1,5 @@
 let
-    Doc = Spss.Document(Extension.Contents("spss.types.sav")),
+    Doc = Spss.Document(PQDriverless.Fixture("spss.types.sav")),
     Out = Table.TransformColumns(Doc, {{"Data",
         each if Value.Is(_, type table) then Table.ToRecords(_) else _}})
 in

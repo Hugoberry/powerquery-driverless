@@ -1,1 +1,1 @@
-Avro.Document(Extension.Contents("avro.scalars.avro"))
+Avro.Document(PQDriverless.Fixture("avro.scalars.avro"))

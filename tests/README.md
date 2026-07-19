@@ -10,10 +10,14 @@ on pull requests and manual dispatch) or locally on any Windows machine.
 1. `build-mez.ps1` assembles **PQDriverless.mez**: a generated section document
    that exposes every reader `.pq` as a shared member (`Sqlite3.Database`,
    `Dbf.Table`, ...), plus every fixture from each reader's `test/` folder
-   embedded as a resource named `<reader>.<file>`. Test queries load fixtures
-   with `Extension.Contents("dbf.vfp.dbf")`, so nothing depends on paths.
-   Because gpkg/mbtiles call `Sqlite3.Database` as a sibling query, the section
-   document satisfies that reference naturally.
+   embedded as a resource named `<reader>.<file>`. `Extension.Contents` only
+   exists inside the module, so the section also defines an anonymous data
+   source function `PQDriverless.Fixture(optional name)` that serves the
+   embedded fixtures to test queries (`PQDriverless.Fixture("dbf.vfp.dbf")`);
+   the parameter is optional so the data source path stays constant and one
+   anonymous credential covers everything. Because gpkg/mbtiles call
+   `Sqlite3.Database` as a sibling query, the section document satisfies that
+   reference naturally.
 2. `queries/<reader>/<name>.query.pq` are the tests. Each is a single M
    expression. Navigation-table readers are dumped via `Table.ToRecords` per
    entry (full-content check) or `Table.RowCount` (stress fixtures); direct
@@ -43,21 +47,17 @@ pwsh tests/build-mez.ps1
 pwsh tests/run-tests.ps1
 ```
 
-## Assumptions still to verify on a Windows machine
+## Findings from the first CI runs
 
-This scaffold has not yet been executed against a real PQTest.exe; these are
-the things most likely to need a tweak:
-
-1. `PQTest.exe compare` accepts an extension that defines only shared
-   functions (no `DataSource.Kind`), and needs no `set-credential` step since
-   the queries touch no external data source. If a credential is demanded,
-   add a `PQTest.exe set-credential` call to `run-tests.ps1`.
-2. `compare` picks up `<name>.query.pqout` next to the query by convention and
-   records it when missing. If the flag or naming differs, adjust
-   `Invoke-Query`.
-3. `Extension.Contents` resolves the dotted resource names from the zip root.
-4. The serializer handles nested records (`Table.ToRecords` dumps) and the
-   binary column in the mbtiles metadata row.
+1. `PQTest.exe compare` exits 0 even when the query fails; `run-tests.ps1`
+   parses the `Status` field of the JSON output instead.
+2. Test queries cannot call `Extension.Contents` (module scope only) - hence
+   the `PQDriverless.Fixture` data source function, plus a
+   `set-credential -ak anonymous` step against `credential.query.pq` before
+   the suite runs, and a `PQTest info -e` sanity check that the module loads.
+3. `compare` auto-records `<name>.query.pqout` next to the query when it is
+   missing, as documented. Once baselines are committed, a strict mode via
+   `--failOnMissingOutputFile` can prevent silent re-recording.
 
 ## Ideas for later iterations
 

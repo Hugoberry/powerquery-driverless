@@ -1,1 +1,1 @@
-Table.RowCount(Dbf.Table(Extension.Contents("perf.bulk.dbf")))
+Table.RowCount(Dbf.Table(PQDriverless.Fixture("perf.bulk.dbf")))

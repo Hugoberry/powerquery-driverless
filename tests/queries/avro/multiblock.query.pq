@@ -1,1 +1,1 @@
-Table.RowCount(Avro.Document(Extension.Contents("avro.multiblock.avro")))
+Table.RowCount(Avro.Document(PQDriverless.Fixture("avro.multiblock.avro")))

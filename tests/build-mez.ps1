@@ -28,9 +28,18 @@ if (Test-Path $Stage) { Remove-Item $Stage -Recurse -Force }
 New-Item $Stage -ItemType Directory -Force | Out-Null
 
 # ---- section document ----
+# The Fixture accessor is the module's (anonymous) data source function: test
+# queries cannot call Extension.Contents themselves, so fixtures are served
+# through it. Its parameter is optional on purpose - optional parameters stay
+# out of the data source path, so one anonymous credential covers every call.
 $sb = [System.Text.StringBuilder]::new()
 [void]$sb.AppendLine('[Version = "1.0.0"]')
 [void]$sb.AppendLine('section PQDriverless;')
+[void]$sb.AppendLine('')
+[void]$sb.AppendLine('PQDriverless = [ Authentication = [ Anonymous = [] ], Label = "PQDriverless test module" ];')
+[void]$sb.AppendLine('')
+[void]$sb.AppendLine('[DataSource.Kind = "PQDriverless"]')
+[void]$sb.AppendLine('shared PQDriverless.Fixture = (optional name as text) as binary => Extension.Contents(name);')
 [void]$sb.AppendLine('')
 
 foreach ($dir in $Readers) {

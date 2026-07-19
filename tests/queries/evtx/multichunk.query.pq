@@ -1,1 +1,1 @@
-Table.RowCount(Evtx.Document(Extension.Contents("evtx.multichunk.evtx")))
+Table.RowCount(Evtx.Document(PQDriverless.Fixture("evtx.multichunk.evtx")))

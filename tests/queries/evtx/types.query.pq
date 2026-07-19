@@ -1,1 +1,1 @@
-Evtx.Document(Extension.Contents("evtx.types.evtx"))
+Evtx.Document(PQDriverless.Fixture("evtx.types.evtx"))

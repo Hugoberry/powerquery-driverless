@@ -1,1 +1,1 @@
-Dbf.Table(Extension.Contents("dbf.vfp.dbf"), [Memo = Extension.Contents("dbf.vfp.fpt")])
+Dbf.Table(PQDriverless.Fixture("dbf.vfp.dbf"), [Memo = PQDriverless.Fixture("dbf.vfp.fpt")])
