@@ -26,6 +26,7 @@ Every reader here is plain M source. You paste it into a blank query and it work
 | GeoPackage reader (`.gpkg`) | [`gpkg/`](gpkg/) | Working |
 | MBTiles reader (`.mbtiles`) | [`mbtiles/`](mbtiles/) | Working |
 | Microsoft Access reader (`.mdb`, `.accdb`) | [`access/`](access/) | Working |
+| dBASE / FoxPro reader (`.dbf` + `.fpt`/`.dbt`) | [`dbf/`](dbf/) | Working |
 | Codec oracle (Snappy, Brotli, Zstandard, LZ4) | [`codec-oracle/`](codec-oracle/) | Working |
 | CRC-32 (zlib, CRC-32C and friends) | [`crc32/`](crc32/) | Working |
 
@@ -57,6 +58,20 @@ in
 
 See [`access/README.md`](access/README.md) for what's supported and the limitations, in particular around encrypted databases (detected, not supported) and Access 97 files.
 
+### dBASE / FoxPro
+
+The applications built on FoxPro and dBASE never quite died; their `.dbf` files still land on shares, and the only sanctioned reader is the 32-bit Visual FoxPro ODBC/OLE DB driver from 2007. This reader parses the format directly: dBASE III through Visual FoxPro, memo sidecars (`.fpt`/`.dbt`), null flags, varchar, deleted-record flags, language-driver codepages.
+
+```m
+let
+    Source = File.Contents("C:\data\customers.dbf"),
+    Data   = Dbf.Table(Source, [Memo = File.Contents("C:\data\customers.fpt")])
+in
+    Data
+```
+
+See [`dbf/README.md`](dbf/README.md) for options, the type mapping, and limitations.
+
 ### The codec oracle
 
 `Binary.Decompress` only implements GZip and Deflate, which would put every format that compresses its blocks with Snappy, Brotli, Zstandard or LZ4 out of reach. It turns out the engine ships those codecs anyway — `Parquet.Document` uses them — and [`codec-oracle/`](codec-oracle/) makes them callable from plain M by wrapping any compressed stream in a minimal in-memory Parquet file:
@@ -70,7 +85,6 @@ It behaves like the `Binary.Decompress` call that was never implemented, and it 
 ### CRC-32
 
 M has no hashing functions, so file-format checksums (gzip trailers, zip entries, PNG chunks, snappy blocks) normally go unverified. [`crc32/`](crc32/) is a table-driven `Crc32.Compute(binary, optional variant)` covering the zlib polynomial, CRC-32C (Castagnoli, with the snappy framing mask as an option) and the other common variants. See [`crc32/README.md`](crc32/README.md).
->>>>>>> origin/main
 
 ## Design rules
 
