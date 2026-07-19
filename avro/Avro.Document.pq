@@ -56,13 +56,9 @@ let
     //==================== low-level byte access ====================
     Slice = (b as binary, offset as number, count as number) as binary =>
         if count <= 0 then #binary({})
-        else if offset = 0 then BinaryFormat.Binary(count)(b)
-        else BinaryFormat.Record([
-                Skip = BinaryFormat.Binary(offset),
-                Data = BinaryFormat.Binary(count)
-             ])(b)[Data],
+        else Binary.Range(b, offset, count),
 
-    Byte = (off as number) as number => Binary.ToList(Slice(bin, off, 1)){0},
+    Byte = (off as number) as number => BinaryFormat.Byte(Binary.Range(bin, off, 1)),
     Hex  = (b as binary) as text => Text.Upper(Binary.ToText(b, BinaryEncoding.Hex)),
 
     UIntBEOf = (b as binary) as number =>

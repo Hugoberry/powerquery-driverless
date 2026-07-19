@@ -64,13 +64,9 @@ let
     //==================== low-level byte access ====================
     Slice = (b as binary, offset as number, count as number) as binary =>
         if count <= 0 then #binary({})
-        else if offset = 0 then BinaryFormat.Binary(count)(b)
-        else BinaryFormat.Record([
-                Skip = BinaryFormat.Binary(offset),
-                Data = BinaryFormat.Binary(count)
-             ])(b)[Data],
+        else Binary.Range(b, offset, count),
 
-    ByteAt  = (off as number) as number => Binary.ToList(Slice(bin, off, 1)){0},
+    ByteAt  = (off as number) as number => BinaryFormat.Byte(Binary.Range(bin, off, 1)),
     NumList = (n as number) as list => if n <= 0 then {} else {0 .. n - 1},
 
     Ascii = (off as number, count as number) as text =>
@@ -162,11 +158,16 @@ let
     I32 = (off as number) as number => I32Fmt(Slice(bin, off, 4)),
     // an unsigned integer of 1..8 bytes, per byte order
     UIntOf = (b as binary, off as number, size as number) as number =>
-        let
-            bytes = Binary.ToList(Slice(b, off, size)),
-            ord   = if IsLSF then List.Reverse(bytes) else bytes
-        in
-            List.Accumulate(ord, 0, (s, c) => s * 256 + c),
+        if size = 1 then BinaryFormat.Byte(Binary.Range(b, off, 1))
+        else if size = 2 then U16Fmt(Binary.Range(b, off, 2))
+        else if size = 4 then U32Fmt(Binary.Range(b, off, 4))
+        else if size = 8 then U64Fmt(Binary.Range(b, off, 8))
+        else
+            let
+                bytes = Binary.ToList(Slice(b, off, size)),
+                ord   = if IsLSF then List.Reverse(bytes) else bytes
+            in
+                List.Accumulate(ord, 0, (s, c) => s * 256 + c),
     UIntAt = (off as number, size as number) as number => UIntOf(bin, off, size),
 
     //==================== character encoding ====================

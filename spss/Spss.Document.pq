@@ -61,16 +61,12 @@ let
     //==================== low-level byte access ====================
     Slice = (b as binary, offset as number, count as number) as binary =>
         if count <= 0 then #binary({})
-        else if offset = 0 then BinaryFormat.Binary(count)(b)
-        else BinaryFormat.Record([
-                Skip = BinaryFormat.Binary(offset),
-                Data = BinaryFormat.Binary(count)
-             ])(b)[Data],
+        else Binary.Range(b, offset, count),
 
     U32Fmt = BinaryFormat.ByteOrder(BinaryFormat.UnsignedInteger32, ByteOrder.LittleEndian),
     F64Fmt = BinaryFormat.ByteOrder(BinaryFormat.Double, ByteOrder.LittleEndian),
 
-    ByteOf = (b as binary, off as number) as number => Binary.ToList(Slice(b, off, 1)){0},
+    ByteOf = (b as binary, off as number) as number => BinaryFormat.Byte(Binary.Range(b, off, 1)),
     U32Of  = (b as binary, off as number) as number => U32Fmt(Slice(b, off, 4)),
     I32Of  = (b as binary, off as number) as number =>
         let u = U32Of(b, off) in if u >= 2147483648 then u - 4294967296 else u,
