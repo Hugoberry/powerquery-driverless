@@ -1,0 +1,1 @@
+#table( type table [Name = any, RootPage = any, SQL = any, Data = any] , {{"Many", 2, "CREATE TABLE Many (id INTEGER PRIMARY KEY, val TEXT)", 4990} } ) 

@@ -1,0 +1,1 @@
+#table( type table [Name = text, Data = any, Hidden = logical, ItemKind = text, ItemName = text, IsLeaf = logical] , {{"Stored", {[ Column1 = "stored, not deflated", Column2 = 99.5 ] } , false, "Sheet", "Sheet", true} } ) 

@@ -1,0 +1,1 @@
+#table( type table [CITY = text, POP = number] , {{"Москва", 13100000} , {"Київ", 2950000} , {"", null} } ) 

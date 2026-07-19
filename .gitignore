@@ -2,3 +2,7 @@ context
 *.pyc
 .DS_Store
 __pycache__/*
+tests/out/
+tests/perf/out/
+tests/perf/queries/*.pqout
+.pqtools/

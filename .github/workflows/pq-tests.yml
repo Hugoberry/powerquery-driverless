@@ -1,0 +1,54 @@
+name: PQ tests
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sqlite_rows:
+        description: Rows in the sqlite perf fixture
+        default: "1000000"
+      dbf_rows:
+        description: Rows in the dbf perf fixture (keep modest while the reader is quadratic)
+        default: "20000"
+
+permissions:
+  contents: read
+
+jobs:
+  pqtest:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate perf fixtures
+        run: >
+          python tests/perf/make_perf_fixtures.py
+          --sqlite-rows ${{ github.event.inputs.sqlite_rows || '1000000' }}
+          --dbf-rows ${{ github.event.inputs.dbf_rows || '20000' }}
+
+      - name: Install Microsoft.PowerQuery.SdkTools
+        run: nuget install Microsoft.PowerQuery.SdkTools -OutputDirectory .pqtools -NonInteractive
+
+      - name: Build PQDriverless.mez
+        run: pwsh tests/build-mez.ps1
+
+      - name: Run PQTest suite
+        run: pwsh tests/run-tests.ps1
+
+      - name: Upload report and mez
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pqtest-report
+          path: |
+            tests/out/report.md
+            tests/out/report.json
+            tests/out/logs/
+            tests/out/PQDriverless.mez
+            tests/queries/**/*.query.pqout
