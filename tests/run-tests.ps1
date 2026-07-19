@@ -75,7 +75,7 @@ function Invoke-Query {
     if ($IsPerf -and (Test-Path $pqout)) { Remove-Item $pqout -Force }
     $hadBaseline = Test-Path $pqout
 
-    $log = Join-Path $LogDir ($Query.BaseName + ".log")
+    $log = Join-Path $LogDir ($Query.Directory.Name + "-" + $Query.BaseName + ".log")
     $sw  = [System.Diagnostics.Stopwatch]::StartNew()
     & $PqTest compare -e $Mez -q $Query.FullName -p > $log 2>&1
     $sw.Stop()
@@ -97,6 +97,13 @@ function Invoke-Query {
         else                                              { "PASS" }
 
     $note = ""
+    if ($status -like "FAIL*") {
+        try {
+            $details = (@($j)[0].Details -replace '\s+', ' ').Trim()
+            if ($details.Length -gt 120) { $details = $details.Substring(0, 120) + "..." }
+            $note = $details
+        } catch { }
+    }
     if ($IsPerf -and (Test-Path $pqout)) {
         $note = ((Get-Content $pqout -Raw) -replace '\s+', ' ').Trim()
         if ($note.Length -gt 120) { $note = $note.Substring(0, 120) + "..." }
