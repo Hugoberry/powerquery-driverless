@@ -63,25 +63,36 @@ let
     //==================== low-level byte access ====================
     Slice = (b as binary, offset as number, count as number) as binary =>
         if count <= 0 then #binary({})
-        else if offset = 0 then BinaryFormat.Binary(count)(b)
-        else BinaryFormat.Record([
-                Skip = BinaryFormat.Binary(offset),
-                Data = BinaryFormat.Binary(count)
-             ])(b)[Data],
+        else Binary.Range(b, offset, count),
 
-    Byte = (off as number) as number => Binary.ToList(Slice(bin, off, 1)){0},
+    Byte = (off as number) as number => BinaryFormat.Byte(Binary.Range(bin, off, 1)),
+
+    U16Fmt   = BinaryFormat.ByteOrder(BinaryFormat.UnsignedInteger16, ByteOrder.LittleEndian),
+    U32Fmt   = BinaryFormat.ByteOrder(BinaryFormat.UnsignedInteger32, ByteOrder.LittleEndian),
+    I32Fmt   = BinaryFormat.ByteOrder(BinaryFormat.SignedInteger32,   ByteOrder.LittleEndian),
+    I64Fmt   = BinaryFormat.ByteOrder(BinaryFormat.SignedInteger64,   ByteOrder.LittleEndian),
+    U16BEFmt = BinaryFormat.ByteOrder(BinaryFormat.UnsignedInteger16, ByteOrder.BigEndian),
+    U32BEFmt = BinaryFormat.ByteOrder(BinaryFormat.UnsignedInteger32, ByteOrder.BigEndian),
 
     UIntLEOf = (b as binary) as number =>             // little-endian unsigned
-        List.Accumulate(Binary.ToList(b), [v = 0, s = 1],
-            (st, c) => [v = st[v] + c * st[s], s = st[s] * 256])[v],
+        let n = Binary.Length(b)
+        in  if n = 2 then U16Fmt(b)
+            else if n = 4 then U32Fmt(b)
+            else List.Accumulate(Binary.ToList(b), [v = 0, s = 1],
+                     (st, c) => [v = st[v] + c * st[s], s = st[s] * 256])[v],
     IntLEOf = (b as binary) as number =>              // two's complement
-        let n = Binary.Length(b),
-            u = UIntLEOf(b)
+        let n = Binary.Length(b)
         in  if n = 0 then 0
-            else if u >= Number.Power(2, 8 * n - 1) then u - Number.Power(2, 8 * n)
-            else u,
+            else if n = 4 then I32Fmt(b)
+            else if n = 8 then I64Fmt(b)
+            else let u = UIntLEOf(b)
+                 in  if u >= Number.Power(2, 8 * n - 1) then u - Number.Power(2, 8 * n)
+                     else u,
     UIntBEOf = (b as binary) as number =>
-        List.Accumulate(Binary.ToList(b), 0, (s, c) => s * 256 + c),
+        let n = Binary.Length(b)
+        in  if n = 2 then U16BEFmt(b)
+            else if n = 4 then U32BEFmt(b)
+            else List.Accumulate(Binary.ToList(b), 0, (s, c) => s * 256 + c),
     DoubleOf = BinaryFormat.ByteOrder(BinaryFormat.Double, ByteOrder.LittleEndian),
     NulChar  = Character.FromNumber(0),
 

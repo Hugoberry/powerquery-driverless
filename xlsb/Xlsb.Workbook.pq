@@ -56,20 +56,16 @@ let
     //==================== low-level byte access ====================
     Slice = (b as binary, offset as number, count as number) as binary =>
         if count <= 0 then #binary({})
-        else if offset = 0 then BinaryFormat.Binary(count)(b)
-        else BinaryFormat.Record([
-                Skip = BinaryFormat.Binary(offset),
-                Data = BinaryFormat.Binary(count)
-             ])(b)[Data],
+        else Binary.Range(b, offset, count),
 
-    UIntLEOf = (b as binary) as number =>                      // little-endian
-        List.Accumulate(List.Reverse(Binary.ToList(b)), 0, (s, c) => s * 256 + c),
+    U16Fmt = BinaryFormat.ByteOrder(BinaryFormat.UnsignedInteger16, ByteOrder.LittleEndian),
+    U32Fmt = BinaryFormat.ByteOrder(BinaryFormat.UnsignedInteger32, ByteOrder.LittleEndian),
+    F64Fmt = BinaryFormat.ByteOrder(BinaryFormat.Double, ByteOrder.LittleEndian),
 
-    ByteAt  = (b as binary, off as number) as number => Binary.ToList(Slice(b, off, 1)){0},
-    UInt2At = (b as binary, off as number) as number => UIntLEOf(Slice(b, off, 2)),
-    UInt4At = (b as binary, off as number) as number => UIntLEOf(Slice(b, off, 4)),
-    Float8At = (b as binary, off as number) as number =>
-        BinaryFormat.ByteOrder(BinaryFormat.Double, ByteOrder.LittleEndian)(Slice(b, off, 8)),
+    ByteAt  = (b as binary, off as number) as number => BinaryFormat.Byte(Binary.Range(b, off, 1)),
+    UInt2At = (b as binary, off as number) as number => U16Fmt(Binary.Range(b, off, 2)),
+    UInt4At = (b as binary, off as number) as number => U32Fmt(Binary.Range(b, off, 4)),
+    Float8At = (b as binary, off as number) as number => F64Fmt(Binary.Range(b, off, 8)),
 
     //==================== ZIP container ====================
     // End-of-central-directory: signature 0x06054B50 within the last 64 KB + 22.
@@ -319,7 +315,7 @@ let
                               Number.Mod(Number.IntegerDivide(m, 256), 256),
                               Number.Mod(Number.IntegerDivide(m, 65536), 256),
                               Number.IntegerDivide(m, 16777216)}
-                    in  BinaryFormat.ByteOrder(BinaryFormat.Double, ByteOrder.LittleEndian)(#binary(by))
+                    in  F64Fmt(#binary(by))
         in  if x100 then base / 100 else base,
 
     ErrorText = (code as number) as text =>

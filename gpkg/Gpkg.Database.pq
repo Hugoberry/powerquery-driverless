@@ -66,28 +66,29 @@ let
     //==================== byte access (file header + geometry blobs) ====================
     Slice = (b as binary, offset as number, count as number) as binary =>
         if count <= 0 then #binary({})
-        else if offset = 0 then BinaryFormat.Binary(count)(b)
-        else BinaryFormat.Record([
-                Skip = BinaryFormat.Binary(offset),
-                Data = BinaryFormat.Binary(count)
-             ])(b)[Data],
+        else Binary.Range(b, offset, count),
+
+    U32BEFmt = BinaryFormat.ByteOrder(BinaryFormat.UnsignedInteger32, ByteOrder.BigEndian),
 
     UIntBE = (b as binary) as number =>
-        List.Accumulate(Binary.ToList(b), 0, (s, c) => s * 256 + c),
+        let n = Binary.Length(b)
+        in  if n = 1 then BinaryFormat.Byte(b)
+            else if n = 4 then U32BEFmt(b)
+            else List.Accumulate(Binary.ToList(b), 0, (s, c) => s * 256 + c),
 
     // endian-parameterised reads for GeoPackageBinary / WKB blobs
+    U32LEFmt = BinaryFormat.ByteOrder(BinaryFormat.UnsignedInteger32, ByteOrder.LittleEndian),
+    I32LEFmt = BinaryFormat.ByteOrder(BinaryFormat.SignedInteger32,   ByteOrder.LittleEndian),
+    I32BEFmt = BinaryFormat.ByteOrder(BinaryFormat.SignedInteger32,   ByteOrder.BigEndian),
+    F64LEFmt = BinaryFormat.ByteOrder(BinaryFormat.Double, ByteOrder.LittleEndian),
+    F64BEFmt = BinaryFormat.ByteOrder(BinaryFormat.Double, ByteOrder.BigEndian),
+
     U32At = (b as binary, off as number, little as logical) as number =>
-        BinaryFormat.ByteOrder(BinaryFormat.UnsignedInteger32,
-            if little then ByteOrder.LittleEndian else ByteOrder.BigEndian)
-            (Slice(b, off, 4)),
+        (if little then U32LEFmt else U32BEFmt)(Binary.Range(b, off, 4)),
     I32At = (b as binary, off as number, little as logical) as number =>
-        BinaryFormat.ByteOrder(BinaryFormat.SignedInteger32,
-            if little then ByteOrder.LittleEndian else ByteOrder.BigEndian)
-            (Slice(b, off, 4)),
+        (if little then I32LEFmt else I32BEFmt)(Binary.Range(b, off, 4)),
     F64At = (b as binary, off as number, little as logical) as number =>
-        BinaryFormat.ByteOrder(BinaryFormat.Double,
-            if little then ByteOrder.LittleEndian else ByteOrder.BigEndian)
-            (Slice(b, off, 8)),
+        (if little then F64LEFmt else F64BEFmt)(Binary.Range(b, off, 8)),
 
     //==================== the SQLite core (shared dependency) ====================
     Db = if Text.FromBinary(Slice(bin, 0, 15), TextEncoding.Utf8) <> "SQLite format 3"
