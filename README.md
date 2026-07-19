@@ -2,7 +2,7 @@
 
 **Pure Power Query M readers for binary file formats. No drivers, no installs, no admin rights.**
 
-> ⚠️ Early days. Six readers so far (SQLite 3, GeoPackage, MBTiles, Access, dBASE/FoxPro, EVTX). This README is a placeholder and will grow as more land.
+> ⚠️ Early days. Seven readers so far (SQLite 3, GeoPackage, MBTiles, Access, dBASE/FoxPro, EVTX, MATLAB `.mat`). This README is a placeholder and will grow as more land.
 
 ## Why this exists
 
@@ -28,6 +28,7 @@ Every reader here is plain M source. You paste it into a blank query and it work
 | Microsoft Access reader (`.mdb`, `.accdb`) | [`access/`](access/) | Working |
 | dBASE / FoxPro reader (`.dbf` + `.fpt`/`.dbt`) | [`dbf/`](dbf/) | Working |
 | Windows Event Log reader (`.evtx`) | [`evtx/`](evtx/) | Working |
+| MATLAB MAT-file reader (`.mat`, v5-v7) | [`matlab/`](matlab/) | Working |
 | Codec oracle (Snappy, Brotli, Zstandard, LZ4) | [`codec-oracle/`](codec-oracle/) | Working |
 | CRC-32 (zlib, CRC-32C and friends) | [`crc32/`](crc32/) | Working |
 
