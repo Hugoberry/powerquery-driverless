@@ -2,7 +2,7 @@
 
 **Pure Power Query M readers for binary file formats. No drivers, no installs, no admin rights.**
 
-> ⚠️ Early days. One reader so far (SQLite 3). This README is a placeholder and will grow as more land.
+> ⚠️ Early days. Three readers so far (SQLite 3, GeoPackage, MBTiles). This README is a placeholder and will grow as more land.
 
 ## Why this exists
 
@@ -23,6 +23,8 @@ Every reader here is plain M source. You paste it into a blank query and it work
 | Component | Folder | Status |
 |---|---|---|
 | SQLite 3 reader (`.sqlite`, `.db`, `.db3`) | [`sqlite3/`](sqlite3/) | Working |
+| GeoPackage reader (`.gpkg`) | [`gpkg/`](gpkg/) | Working |
+| MBTiles reader (`.mbtiles`) | [`mbtiles/`](mbtiles/) | Working |
 | dBASE / FoxPro reader (`.dbf` + `.fpt`/`.dbt`) | [`dbf/`](dbf/) | Working |
 | Codec oracle (Snappy, Brotli, Zstandard, LZ4) | [`codec-oracle/`](codec-oracle/) | Working |
 | CRC-32 (zlib, CRC-32C and friends) | [`crc32/`](crc32/) | Working |
@@ -32,7 +34,7 @@ Power BI has no native SQLite connector. The usual answer is the SQLite ODBC dri
 ```m
 let
     Source = File.Contents("C:\data\chinook.db"),
-    Db     = SQLite(Source),
+    Db     = Sqlite3.Database(Source),
     Tracks = Db{[Name = "tracks"]}[Data]
 in
     Tracks
@@ -73,9 +75,7 @@ M has no hashing functions, so file-format checksums (gzip trailers, zip entries
 These are what make the paste-and-go promise hold:
 
 - **Zero dependencies.** Standard library M only. No custom connector, no external assemblies, no ODBC.
-- **One file, one function.** Each reader is a single self-contained `.pq`. No cross-file references — deliberately non-DRY, because the paste is the product.
-- **Honest types.** Native types map to M types. Nothing stringified.
-- **Read-only.** These readers only read. Nothing here writes to your files.
+- **One file, one function.** Each reader is a single self-contained `.pq`. No cross-file references — deliberately non-DRY, because the paste is the product. The one exception: readers for formats that *are* SQLite databases (GeoPackage, MBTiles) call `Sqlite3.Database` as a second pasted query instead of embedding the whole b-tree parser, so SQLite bugfixes land in one place.
 
 ## Licence
 

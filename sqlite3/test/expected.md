@@ -14,7 +14,7 @@ To test, load a fixture through the reader:
 
 ```m
 let
-    db = SQLite(File.Contents("...\sqlite3\test\types.db"))
+    db = Sqlite3.Database(File.Contents("...\sqlite3\test\types.db"))
 in
     db
 ```
@@ -214,7 +214,7 @@ read/write version bytes are 2. Expected: table `Log` with rows (1, entry 1)
 .. (5, entry 5), and the navigation table metadata must report the mode:
 
 ```m
-Value.Metadata(SQLite(File.Contents("...\wal.db")))[SQLite.WalMode] = true
+Value.Metadata(Sqlite3.Database(File.Contents("...\wal.db")))[Sqlite3.WalMode] = true
 ```
 
-The other seven fixtures must report `SQLite.WalMode = false`.
+The other seven fixtures must report `Sqlite3.WalMode = false`.
