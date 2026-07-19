@@ -45,9 +45,12 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # ---- anonymous credential for the PQDriverless data source kind ----
+# CI has no interactive stdin, which puts set-credential into JSON mode, so
+# feed it the JSON the documented way: credential-template piped in.
 $credQuery = Join-Path $PSScriptRoot "credential.query.pq"
 $credLog   = Join-Path $LogDir "_set-credential.log"
-& $PqTest set-credential -e $Mez -q $credQuery -ak anonymous -p > $credLog 2>&1
+& $PqTest credential-template -e $Mez -q $credQuery -ak anonymous |
+    & $PqTest set-credential -e $Mez -q $credQuery -p > $credLog 2>&1
 if ($LASTEXITCODE -ne 0) {
     Get-Content $credLog | Write-Host
     throw "PQTest set-credential failed."
