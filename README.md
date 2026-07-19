@@ -25,6 +25,7 @@ Every reader here is plain M source. You paste it into a blank query and it work
 | SQLite 3 reader (`.sqlite`, `.db`, `.db3`) | [`sqlite3/`](sqlite3/) | Working |
 | GeoPackage reader (`.gpkg`) | [`gpkg/`](gpkg/) | Working |
 | MBTiles reader (`.mbtiles`) | [`mbtiles/`](mbtiles/) | Working |
+| Microsoft Access reader (`.mdb`, `.accdb`) | [`access/`](access/) | Working |
 | dBASE / FoxPro reader (`.dbf` + `.fpt`/`.dbt`) | [`dbf/`](dbf/) | Working |
 | Codec oracle (Snappy, Brotli, Zstandard, LZ4) | [`codec-oracle/`](codec-oracle/) | Working |
 | CRC-32 (zlib, CRC-32C and friends) | [`crc32/`](crc32/) | Working |
@@ -41,6 +42,21 @@ in
 ```
 
 See [`sqlite3/README.md`](sqlite3/README.md) for setup, what's supported, and the limitations — particularly around WAL files and concurrent writes.
+
+### Microsoft Access
+
+Access is the format where the install pain is sharpest. A native connector exists, but it is a wrapper over the ACE OLEDB provider: bitness must match on the Desktop, 64-bit ACE must be installed on the gateway, Click-to-Run Office hides its ACE copy from the gateway entirely, and cloud hosts cannot install it at all. Hence `The 'Microsoft.ACE.OLEDB.12.0' provider is not registered`. This reader parses the Jet 4 / ACE page format directly, so none of that applies.
+
+```m
+let
+    Source = File.Contents("C:\data\example.accdb"),
+    Db     = Access.Database(Source),
+    Orders = Db{[Name = "Orders"]}[Data]
+in
+    Orders
+```
+
+See [`access/README.md`](access/README.md) for what's supported and the limitations, in particular around encrypted databases (detected, not supported) and Access 97 files.
 
 ### dBASE / FoxPro
 
