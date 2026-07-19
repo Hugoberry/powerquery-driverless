@@ -1,0 +1,1 @@
+#table( type table [Name = any, RootPage = any, SQL = any, Data = any] , {{"U", 2, "CREATE TABLE U (id INTEGER PRIMARY KEY, txt TEXT)", {[ id = 1, txt = "plain ascii" ] , [ id = 2, txt = "héllo ✓" ] , [ id = 3, txt = "日本語テキスト" ] , [ id = 4, txt = "emoji 🚀🌍" ] , [ id = 5, txt = "" ] , [ id = 6, txt = null ] } } } ) 
