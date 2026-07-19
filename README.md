@@ -2,7 +2,7 @@
 
 **Pure Power Query M readers for binary file formats. No drivers, no installs, no admin rights.**
 
-> ⚠️ Early days. Five readers so far (SQLite 3, GeoPackage, MBTiles, legacy Excel .xls, Excel Binary .xlsb). This README is a placeholder and will grow as more land.
+> ⚠️ Early days. Nine readers so far (SQLite 3, GeoPackage, MBTiles, Access, dBASE/FoxPro, EVTX, MATLAB `.mat`, legacy Excel .xls, Excel Binary .xlsb). This README is a placeholder and will grow as more land.
 
 ## Why this exists
 
@@ -25,12 +25,16 @@ Every reader here is plain M source. You paste it into a blank query and it work
 | SQLite 3 reader (`.sqlite`, `.db`, `.db3`) | [`sqlite3/`](sqlite3/) | Working |
 | GeoPackage reader (`.gpkg`) | [`gpkg/`](gpkg/) | Working |
 | MBTiles reader (`.mbtiles`) | [`mbtiles/`](mbtiles/) | Working |
+| Microsoft Access reader (`.mdb`, `.accdb`) | [`access/`](access/) | Working |
+| dBASE / FoxPro reader (`.dbf` + `.fpt`/`.dbt`) | [`dbf/`](dbf/) | Working |
+| Windows Event Log reader (`.evtx`) | [`evtx/`](evtx/) | Working |
+| MATLAB MAT-file reader (`.mat`, v5-v7) | [`matlab/`](matlab/) | Working |
 | Legacy Excel reader (`.xls`, Excel 97-2003) | [`xls/`](xls/) | Working |
 | Excel Binary Workbook reader (`.xlsb`) | [`xlsb/`](xlsb/) | Working |
 | Codec oracle (Snappy, Brotli, Zstandard, LZ4) | [`codec-oracle/`](codec-oracle/) | Working |
 | CRC-32 (zlib, CRC-32C and friends) | [`crc32/`](crc32/) | Working |
 
-**SQLite** — Power BI has no native SQLite connector. The usual answer is the SQLite ODBC driver and its machine-level install. This reader parses the [SQLite file format](https://www.sqlite.org/fileformat2.html) directly — header, table b-trees, varints, record serial types, overflow pages — so there's nothing to install.
+Power BI has no native SQLite connector. The usual answer is the SQLite ODBC driver and its machine-level install. This reader parses the [SQLite file format](https://www.sqlite.org/fileformat2.html) directly — header, table b-trees, varints, record serial types, overflow pages — so there's nothing to install.
 
 ```m
 let
@@ -42,6 +46,35 @@ in
 ```
 
 See [`sqlite3/README.md`](sqlite3/README.md) for setup, what's supported, and the limitations — particularly around WAL files and concurrent writes.
+
+### Microsoft Access
+
+Access is the format where the install pain is sharpest. A native connector exists, but it is a wrapper over the ACE OLEDB provider: bitness must match on the Desktop, 64-bit ACE must be installed on the gateway, Click-to-Run Office hides its ACE copy from the gateway entirely, and cloud hosts cannot install it at all. Hence `The 'Microsoft.ACE.OLEDB.12.0' provider is not registered`. This reader parses the Jet 4 / ACE page format directly, so none of that applies.
+
+```m
+let
+    Source = File.Contents("C:\data\example.accdb"),
+    Db     = Access.Database(Source),
+    Orders = Db{[Name = "Orders"]}[Data]
+in
+    Orders
+```
+
+See [`access/README.md`](access/README.md) for what's supported and the limitations, in particular around encrypted databases (detected, not supported) and Access 97 files.
+
+### dBASE / FoxPro
+
+The applications built on FoxPro and dBASE never quite died; their `.dbf` files still land on shares, and the only sanctioned reader is the 32-bit Visual FoxPro ODBC/OLE DB driver from 2007. This reader parses the format directly: dBASE III through Visual FoxPro, memo sidecars (`.fpt`/`.dbt`), null flags, varchar, deleted-record flags, language-driver codepages.
+
+```m
+let
+    Source = File.Contents("C:\data\customers.dbf"),
+    Data   = Dbf.Table(Source, [Memo = File.Contents("C:\data\customers.fpt")])
+in
+    Data
+```
+
+See [`dbf/README.md`](dbf/README.md) for options, the type mapping, and limitations.
 
 ### Legacy Excel and Excel Binary
 
