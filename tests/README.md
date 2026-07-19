@@ -26,10 +26,13 @@ on pull requests and manual dispatch) or locally on any Windows machine.
    times it, and writes `out/report.md` + `out/report.json` (also appended to
    the GitHub job summary). Expected outputs live next to each query as
    `<name>.query.pqout`.
-4. `perf/` holds the benchmark: `make_perf_fixtures.py` generates large
-   fixtures at CI time (row counts are workflow inputs), and `perf/queries/*`
-   are row-count queries that are timed but never compared, so the benchmark
-   sizes can change without touching baselines.
+4. `perf/` holds the benchmark: `make_perf_fixtures.py` generates one large
+   fixture per random-access reader (stdlib-only; row counts are CLI args,
+   the sqlite/dbf ones are workflow inputs), and `perf/queries/*` are
+   full-decode queries — they fold every cell of every table into a non-null
+   count, so lazy row streaming cannot skip the per-cell decode paths — that
+   are timed but never compared, so benchmark sizes can change without
+   touching baselines. Access has no synthetic writer and is not covered.
 
 ## Recording baselines
 
