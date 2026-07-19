@@ -36,12 +36,17 @@ if (-not (Test-Path $Mez)) { throw "$Mez not found. Run tests/build-mez.ps1 firs
 $LogDir = Join-Path $ReportDir "logs"
 New-Item $LogDir -ItemType Directory -Force | Out-Null
 
+# PQTest.exe exit codes are unreliable across the board (errors often exit 0),
+# so every step below validates the JSON it prints, never the exit code alone.
+
 # ---- sanity: does the module load, and what does it export? ----
 $infoLog = Join-Path $LogDir "_info.log"
 & $PqTest info -e $Mez -p > $infoLog 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Get-Content $infoLog | Write-Host
-    throw "PQTest info failed - the extension module did not load."
+$info = Get-Content $infoLog -Raw
+try { $infoJson = $info | ConvertFrom-Json } catch { Write-Host $info; throw "PQTest info produced no JSON." }
+$broken = @($infoJson) | Where-Object { $_.ErrorStatus }
+if ($broken) {
+    throw "Extension module failed to compile: $($broken.ErrorStatus -join '; ')"
 }
 
 # ---- anonymous credential for the PQDriverless data source kind ----
@@ -49,11 +54,16 @@ if ($LASTEXITCODE -ne 0) {
 # feed it the JSON the documented way: credential-template piped in.
 $credQuery = Join-Path $PSScriptRoot "credential.query.pq"
 $credLog   = Join-Path $LogDir "_set-credential.log"
-& $PqTest credential-template -e $Mez -q $credQuery -ak anonymous |
-    & $PqTest set-credential -e $Mez -q $credQuery -p > $credLog 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Get-Content $credLog | Write-Host
-    throw "PQTest set-credential failed."
+$template  = (& $PqTest credential-template -e $Mez -q $credQuery -ak anonymous 2>&1) -join "`n"
+if ($template.Trim() -notmatch '^\{') {
+    Write-Host $template
+    throw "credential-template did not return JSON."
+}
+$template | & $PqTest set-credential -e $Mez -q $credQuery -p > $credLog 2>&1
+$credOut = Get-Content $credLog -Raw
+if ($credOut -notmatch '"Status"\s*:\s*"Success"') {
+    Write-Host $credOut
+    throw "PQTest set-credential did not report Success."
 }
 
 $results = @()

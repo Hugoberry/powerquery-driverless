@@ -23,6 +23,8 @@ $Readers = @(
     "crc32", "codec-oracle"
 )
 
+$Renames = @{ "Access.Database" = "AccessReader.Database" }
+
 $Stage = Join-Path $OutDir "stage"
 if (Test-Path $Stage) { Remove-Item $Stage -Recurse -Force }
 New-Item $Stage -ItemType Directory -Force | Out-Null
@@ -47,6 +49,9 @@ foreach ($dir in $Readers) {
     if (-not (Test-Path $full)) { continue }
     foreach ($pq in Get-ChildItem $full -Filter *.pq -File) {
         $name = $pq.BaseName
+        # Names that collide with built-in engine functions abort the whole
+        # module compile, so those readers are exported under a test-only name.
+        if ($Renames.ContainsKey($name)) { $name = $Renames[$name] }
         $body = Get-Content $pq.FullName -Raw
         [void]$sb.AppendLine("// ==== $dir/$($pq.Name) ====")
         [void]$sb.AppendLine("shared $name =")
