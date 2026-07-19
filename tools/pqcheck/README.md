@@ -25,7 +25,7 @@ npm run check        # checks every .pq/.m file in the repo
 or against specific files or folders:
 
 ```sh
-node check.js ../../sqlite3/SQLiteReader.pq
+node check.js ../../sqlite3/Sqlite3.Database.pq
 node check.js ../../access
 ```
 

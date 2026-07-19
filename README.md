@@ -2,7 +2,7 @@
 
 **Pure Power Query M readers for binary file formats. No drivers, no installs, no admin rights.**
 
-> ⚠️ Early days. Three readers so far (SQLite 3, legacy Excel .xls, Excel Binary .xlsb). This README is a placeholder and will grow as more land.
+> ⚠️ Early days. Five readers so far (SQLite 3, GeoPackage, MBTiles, legacy Excel .xls, Excel Binary .xlsb). This README is a placeholder and will grow as more land.
 
 ## Why this exists
 
@@ -20,18 +20,22 @@ Every reader here is plain M source. You paste it into a blank query and it work
 
 ## What's here
 
-| Format | Folder | Status |
+| Component | Folder | Status |
 |---|---|---|
-| SQLite 3 (`.sqlite`, `.db`, `.db3`) | [`sqlite3/`](sqlite3/) | Working |
-| Legacy Excel (`.xls`, Excel 97-2003) | [`xls/`](xls/) | Working |
-| Excel Binary Workbook (`.xlsb`) | [`xlsb/`](xlsb/) | Working |
+| SQLite 3 reader (`.sqlite`, `.db`, `.db3`) | [`sqlite3/`](sqlite3/) | Working |
+| GeoPackage reader (`.gpkg`) | [`gpkg/`](gpkg/) | Working |
+| MBTiles reader (`.mbtiles`) | [`mbtiles/`](mbtiles/) | Working |
+| Legacy Excel reader (`.xls`, Excel 97-2003) | [`xls/`](xls/) | Working |
+| Excel Binary Workbook reader (`.xlsb`) | [`xlsb/`](xlsb/) | Working |
+| Codec oracle (Snappy, Brotli, Zstandard, LZ4) | [`codec-oracle/`](codec-oracle/) | Working |
+| CRC-32 (zlib, CRC-32C and friends) | [`crc32/`](crc32/) | Working |
 
 **SQLite** — Power BI has no native SQLite connector. The usual answer is the SQLite ODBC driver and its machine-level install. This reader parses the [SQLite file format](https://www.sqlite.org/fileformat2.html) directly — header, table b-trees, varints, record serial types, overflow pages — so there's nothing to install.
 
 ```m
 let
     Source = File.Contents("C:\data\chinook.db"),
-    Db     = SQLite(Source),
+    Db     = Sqlite3.Database(Source),
     Tracks = Db{[Name = "tracks"]}[Data]
 in
     Tracks
@@ -39,16 +43,30 @@ in
 
 See [`sqlite3/README.md`](sqlite3/README.md) for setup, what's supported, and the limitations — particularly around WAL files and concurrent writes.
 
-**Legacy Excel and Excel Binary** — Power Query reads `.xls` and `.xlsb` through the Access Database Engine (ACE), which cannot be installed in cloud environments, so these files force a gateway in Power Query Online even when they already sit in SharePoint or Blob Storage. These readers parse BIFF8-in-CFB (`.xls`) and BIFF12-in-ZIP (`.xlsb`) directly. They are also more correct than the ACE path: ACE guesses column types from the first rows and nulls out mismatches, while these readers decode every cell from its record type. See [`xls/README.md`](xls/README.md) and [`xlsb/README.md`](xlsb/README.md).
+### Legacy Excel and Excel Binary
+
+Power Query reads `.xls` and `.xlsb` through the Access Database Engine (ACE), which cannot be installed in cloud environments, so these files force a gateway in Power Query Online even when they already sit in SharePoint or Blob Storage. These readers parse BIFF8-in-CFB (`.xls`) and BIFF12-in-ZIP (`.xlsb`) directly. They are also more correct than the ACE path: ACE guesses column types from the first rows and nulls out mismatches, while these readers decode every cell from its record type. See [`xls/README.md`](xls/README.md) and [`xlsb/README.md`](xlsb/README.md).
+
+### The codec oracle
+
+`Binary.Decompress` only implements GZip and Deflate, which would put every format that compresses its blocks with Snappy, Brotli, Zstandard or LZ4 out of reach. It turns out the engine ships those codecs anyway — `Parquet.Document` uses them — and [`codec-oracle/`](codec-oracle/) makes them callable from plain M by wrapping any compressed stream in a minimal in-memory Parquet file:
+
+```m
+Codec.Decompress(File.Contents("C:\data\block.snappy"), Compression.Snappy)
+```
+
+It behaves like the `Binary.Decompress` call that was never implemented, and it is the building block that lets readers here support formats whose internals use these codecs. See [`codec-oracle/README.md`](codec-oracle/README.md) for how it works and how to verify codec support on your host.
+
+### CRC-32
+
+M has no hashing functions, so file-format checksums (gzip trailers, zip entries, PNG chunks, snappy blocks) normally go unverified. [`crc32/`](crc32/) is a table-driven `Crc32.Compute(binary, optional variant)` covering the zlib polynomial, CRC-32C (Castagnoli, with the snappy framing mask as an option) and the other common variants. See [`crc32/README.md`](crc32/README.md).
 
 ## Design rules
 
 These are what make the paste-and-go promise hold:
 
 - **Zero dependencies.** Standard library M only. No custom connector, no external assemblies, no ODBC.
-- **One file, one function.** Each reader is a single self-contained `.pq`. No cross-file references — deliberately non-DRY, because the paste is the product.
-- **Honest types.** Native types map to M types. Nothing stringified.
-- **Read-only.** These readers only read. Nothing here writes to your files.
+- **One file, one function.** Each reader is a single self-contained `.pq`. No cross-file references — deliberately non-DRY, because the paste is the product. The one exception: readers for formats that *are* SQLite databases (GeoPackage, MBTiles) call `Sqlite3.Database` as a second pasted query instead of embedding the whole b-tree parser, so SQLite bugfixes land in one place.
 
 ## Licence
 

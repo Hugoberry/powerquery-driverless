@@ -1,14 +1,24 @@
-// Read SQLite database files in pure Power Query M.
+// SPDX-License-Identifier: Apache-2.0
+//
+// Sqlite3.Database.pq — read SQLite database files in pure Power Query M.
 // No ODBC, no ADO.NET provider, no Python/R, no custom connector required.
-// Paste into a blank query, or wrap as a function in your PBIX / dataflow.
+// Paste into a blank query (name it Sqlite3.Database), or wrap as a function
+// in your PBIX / dataflow.
 //
 // Usage:
 //   let
-//       SQLite = <this expression>,
-//       db  = SQLite(File.Contents("C:\path\to\your.db")),   // nav table of tables
+//       Sqlite3.Database = <this expression>,
+//       db  = Sqlite3.Database(File.Contents("C:\path\to\your.db")),  // nav table
 //       tbl = db{[Name = "my_table"]}[Data]
 //   in
 //       tbl
+//
+// Options (optional second argument, all keys optional):
+//   MaxRows  number — decode at most this many rows per table.
+//
+// This function is also the shared SQLite core for the GeoPackage (gpkg/) and
+// MBTiles (mbtiles/) readers in this repository: they expect a query named
+// Sqlite3.Database next to them. Fix b-tree or record-decoding bugs here, once.
 //
 // Supported: ordinary rowid tables, all serial types, overflow pages,
 //            INTEGER PRIMARY KEY rowid aliasing, UTF-8/UTF-16LE/UTF-16BE,
@@ -17,9 +27,12 @@
 //            reading un-checkpointed data from a -wal file (see notes at end).
 // Precision: integers beyond 2^53 lose precision (M numbers are doubles).
 
-(dbBlob as binary) as table =>
+(source as binary, optional options as nullable record) as table =>
 let
-    bin = Binary.Buffer(dbBlob),
+    bin = Binary.Buffer(source),
+
+    opts       = if options = null then [] else options,
+    OptMaxRows = Record.FieldOrDefault(opts, "MaxRows", null),
 
     //==================== low-level byte access ====================
     Slice = (b as binary, offset as number, count as number) as binary =>
@@ -57,7 +70,7 @@ let
     //==================== file header ====================
     Magic = Text.FromBinary(Slice(bin, 0, 15), TextEncoding.Utf8),
     ps0   = if Magic <> "SQLite format 3"
-            then error Error.Record("SQLiteReader", "Not a SQLite 3 database file", Magic)
+            then error Error.Record("DataFormat.Error", "Not a SQLite 3 database file", Magic)
             else UInt2(16),
     PageSize   = if ps0 = 1 then 65536 else ps0,
     WriteVer   = Byte(18),                       // 1 = rollback journal, 2 = WAL
@@ -121,7 +134,7 @@ let
                 in
                     List.Combine(List.Transform(all, (p) => @CollectCells(p)))
             else
-                error Error.Record("SQLiteReader",
+                error Error.Record("DataFormat.Error",
                     "Page " & Number.ToText(pageNum) &
                     " is not a table b-tree page (type " & Number.ToText(ptype) & ")." &
                     " WITHOUT ROWID tables and indexes are not supported.", null),
@@ -133,7 +146,8 @@ let
         else if st = 5 then 6
         else if st = 6 or st = 7 then 8
         else if st >= 12 then Number.IntegerDivide(st - 12, 2)
-        else error Error.Record("SQLiteReader", "Reserved serial type " & Number.ToText(st), null),
+        else error Error.Record("DataFormat.Error",
+                 "Reserved SQLite serial type " & Number.ToText(st), null),
 
     DecodeValue = (payload as binary, off as number, st as number) as any =>
         if st = 0 then null
@@ -216,7 +230,8 @@ let
             cols   = parsed[Columns],
             ipk    = parsed[IpkIndex],
             ncols  = List.Count(cols),
-            cells  = CollectCells(rootPage),
+            cells0 = CollectCells(rootPage),
+            cells  = if OptMaxRows = null then cells0 else List.FirstN(cells0, OptMaxRows),
             rows = List.Transform(cells, (c) =>
                 let
                     vals   = DecodeRecord(c[Payload]),
@@ -246,9 +261,9 @@ let
     nav0 = Table.AddColumn(userTables, "Data", each
         let rp = [rootpage], sq = [sql] in
         if rp = null or rp = 0 then
-            error Error.Record("SQLiteReader", "Virtual table — no b-tree storage", [name])
+            error Error.Record("DataFormat.Error", "Virtual table — no b-tree storage", [name])
         else if Text.Contains(Text.Upper(sq), "WITHOUT ROWID") then
-            error Error.Record("SQLiteReader", "WITHOUT ROWID tables are not supported", [name])
+            error Error.Record("DataFormat.Error", "WITHOUT ROWID tables are not supported", [name])
         else DecodeTable(rp, sq),
         type table),
 
@@ -256,9 +271,9 @@ let
               Table.RenameColumns(nav0, {{"name", "Name"}, {"rootpage", "RootPage"}, {"sql", "SQL"}}),
               {"Name", "RootPage", "SQL", "Data"})
               meta [
-                  SQLite.PageSize   = PageSize,
-                  SQLite.Encoding   = EncodingId,
-                  SQLite.WalMode    = (WriteVer = 2)   // true => a -wal file may hold newer data
+                  Sqlite3.PageSize   = PageSize,
+                  Sqlite3.Encoding   = EncodingId,
+                  Sqlite3.WalMode    = (WriteVer = 2)   // true => a -wal file may hold newer data
               ]
 in
     nav
