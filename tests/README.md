@@ -58,6 +58,11 @@ pwsh tests/run-tests.ps1
 3. `compare` auto-records `<name>.query.pqout` next to the query when it is
    missing, as documented. Once baselines are committed, a strict mode via
    `--failOnMissingOutputFile` can prevent silent re-recording.
+4. Error values cannot round-trip through a `.pqout`: they serialize as
+   comments, so the reloaded expected value never equals the live error and
+   the comparison fails forever after recording. Queries over fixtures with
+   deliberate error cells (xlsb `types.xlsb`) must scrub errors to a text
+   marker first - see `queries/xlsb/types.query.pq` for the pattern.
 
 ## Ideas for later iterations
 
