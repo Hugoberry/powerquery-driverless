@@ -36,22 +36,34 @@ function Next-Value($lcg) {
 }
 
 # ---- workbooks via Excel COM ----
+# Rows are written in blocks: one giant SAFEARRAY assignment is fragile at
+# 10x-scale row counts, and block writes keep memory flat.
 function Write-Workbook([string]$Path, [int]$Rows, [int]$Cols, [int]$FileFormat) {
+    if ($Rows + 1 -gt 65536 -and $FileFormat -eq 56) { throw "BIFF8 (.xls) holds at most 65536 rows incl. header; got $Rows." }
     $lcg = New-Lcg
-    $data = New-Object 'object[,]' ($Rows + 1), $Cols
-    $headers = @("id", "value", "flag", "name")
-    for ($c = 0; $c -lt $Cols; $c++) { $data[0, $c] = $headers[$c] }
-    for ($r = 1; $r -le $Rows; $r++) {
-        $data[$r, 0] = $r - 1
-        $data[$r, 1] = Next-Value $lcg
-        $data[$r, 2] = ($r - 1) % 2
-        if ($Cols -ge 4) { $data[$r, 3] = "row-{0:d7}" -f ($r - 1) }
-    }
     $wb = $script:xl.Workbooks.Add()
     $ws = $wb.Worksheets.Item(1)
     $ws.Name = "Bulk"
-    $range = $ws.Range($ws.Cells(1, 1), $ws.Cells($Rows + 1, $Cols))
-    $range.Value2 = $data
+
+    $headers = New-Object 'object[,]' 1, $Cols
+    $names = @("id", "value", "flag", "name")
+    for ($c = 0; $c -lt $Cols; $c++) { $headers[0, $c] = $names[$c] }
+    $ws.Range($ws.Cells(1, 1), $ws.Cells(1, $Cols)).Value2 = $headers
+
+    $block = 10000
+    for ($start = 0; $start -lt $Rows; $start += $block) {
+        $n = [math]::Min($block, $Rows - $start)
+        $data = New-Object 'object[,]' $n, $Cols
+        for ($i = 0; $i -lt $n; $i++) {
+            $r = $start + $i
+            $data[$i, 0] = $r
+            $data[$i, 1] = Next-Value $lcg
+            $data[$i, 2] = $r % 2
+            if ($Cols -ge 4) { $data[$i, 3] = "row-{0:d7}" -f $r }
+        }
+        $ws.Range($ws.Cells($start + 2, 1), $ws.Cells($start + 1 + $n, $Cols)).Value2 = $data
+    }
+
     if (Test-Path $Path) { Remove-Item $Path -Force }
     $wb.SaveAs($Path, $FileFormat)
     $wb.Close($false)

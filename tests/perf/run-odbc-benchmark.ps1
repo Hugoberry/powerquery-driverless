@@ -26,6 +26,9 @@
 
 param(
     [int]$Runs        = 5,
+    # Distinguishes runs at non-default fixture scales: results are written to
+    # <hostname>-<label>.json+md instead of <hostname>.json+md.
+    [string]$Label    = "",
     [string]$PqTest,
     [string]$Mez      = (Join-Path (Split-Path $PSScriptRoot -Parent) "out/PQDriverless.mez"),
     [string]$ToolsDir = (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) ".pqtools"),
@@ -167,6 +170,7 @@ $envInfo = [ordered]@{
 $report = [ordered]@{
     schema      = 2
     method      = [ordered]@{
+        label     = $Label
         runs      = $Runs
         statistic = "median"
         timing    = "wall clock of one PQTest.exe compare per run, warm file cache; includes process startup (see overheadMs)"
@@ -178,11 +182,12 @@ $report = [ordered]@{
 }
 
 New-Item $OutDir -ItemType Directory -Force | Out-Null
-$jsonPath = Join-Path $OutDir "$($env:COMPUTERNAME).json"
+$baseName = if ($Label) { "$($env:COMPUTERNAME)-$Label" } else { $env:COMPUTERNAME }
+$jsonPath = Join-Path $OutDir "$baseName.json"
 $report | ConvertTo-Json -Depth 5 | Set-Content $jsonPath -Encoding UTF8
 
 $md = [System.Text.StringBuilder]::new()
-[void]$md.AppendLine("# ODBC vs driverless: $($env:COMPUTERNAME)")
+[void]$md.AppendLine("# ODBC vs driverless: $baseName")
 [void]$md.AppendLine("")
 foreach ($k in $envInfo.Keys) { [void]$md.AppendLine("- **$k**: $($envInfo[$k])") }
 [void]$md.AppendLine("- **overhead**: $($overhead.MedianMs) ms median (trivial query; subtracted for eval-only)")
@@ -198,7 +203,7 @@ foreach ($r in $pairingResults) {
         [void]$md.AppendLine("| $($r.name) | $($r.output) | $($r.driverless.medianMs) | $($r.odbc.medianMs) | $($r.driverless.evalMs) | $($r.odbc.evalMs) | $($r.evalRatio)x |")
     }
 }
-$mdPath = Join-Path $OutDir "$($env:COMPUTERNAME).md"
+$mdPath = Join-Path $OutDir "$baseName.md"
 $md.ToString() | Set-Content $mdPath -Encoding UTF8
 
 Write-Host ""
