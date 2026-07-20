@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "method": {
+    "runs": 5,
+    "statistic": "median",
+    "timing": "wall clock of one PQTest.exe compare per run, warm file cache; includes process startup (see overhead case)",
+    "query": "full decode: List.Sum(List.Transform(Table.ToRows(data), List.NonNullCount)) over 200k rows x 4 cols"
+  },
+  "environment": {
+    "machine": "WOOM",
+    "timestamp": "2026-07-20T19:31:21+01:00",
+    "cpu": "12th Gen Intel(R) Core(TM) i7-1260P",
+    "cores": 12,
+    "logicalCpus": 16,
+    "ramGB": 31.7,
+    "disk": "SAMSUNG MZVL21T0HCLR-00BL7 (SSD, NVMe)",
+    "os": "Microsoft Windows 11 Pro build 26200",
+    "powerPlan": "Balanced",
+    "pqTestVersion": "2.155.2.0",
+    "odbcDriver": "sqliteodbc 0.99991 (C:\\WINDOWS\\system32\\sqlite3odbc.dll)",
+    "office": "none",
+    "fixture": "bulk.db, 5.8 MB, sha256 6980ed70eb871c27b6086c6b19d45512ee7831d2459b657dca84c65b0819ed9a"
+  },
+  "results": [
+    {
+      "case": "overhead (trivial query)",
+      "runsMs": [
+        3894.0,
+        4030.0,
+        3877.0,
+        3916.0,
+        4171.0
+      ],
+      "medianMs": 3916.0,
+      "output": "1"
+    },
+    {
+      "case": "sqlite3 driverless",
+      "runsMs": [
+        21849.0,
+        22812.0,
+        22358.0,
+        22279.0,
+        22403.0
+      ],
+      "medianMs": 22358.0,
+      "output": "800000"
+    },
+    {
+      "case": "sqlite3 odbc",
+      "runsMs": [
+        5211.0,
+        4732.0,
+        4688.0,
+        4508.0,
+        4526.0
+      ],
+      "medianMs": 4688.0,
+      "output": "800000"
+    }
+  ],
+  "derived": {
+    "driverlessEvalMs": 18442.0,
+    "odbcEvalMs": 772.0,
+    "wallRatio": 4.77,
+    "evalRatio": 23.89
+  }
+}

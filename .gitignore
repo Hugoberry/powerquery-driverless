@@ -5,4 +5,5 @@ __pycache__/*
 tests/out/
 tests/perf/out/
 tests/perf/queries/*.pqout
+tests/perf/odbc/out/
 .pqtools/
