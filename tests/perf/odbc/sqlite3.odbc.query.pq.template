@@ -1,0 +1,4 @@
+let
+    Data = Odbc.Query("Driver={SQLite3 ODBC Driver};Database=__PERF_OUT__\bulk.db", "SELECT * FROM data")
+in
+    List.Sum(List.Transform(Table.ToRows(Data), List.NonNullCount))

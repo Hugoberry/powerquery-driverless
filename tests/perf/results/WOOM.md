@@ -1,7 +1,7 @@
 # ODBC vs driverless: WOOM
 
 - **machine**: WOOM
-- **timestamp**: 2026-07-20T19:31:21+01:00
+- **timestamp**: 2026-07-20T20:47:53+01:00
 - **cpu**: 12th Gen Intel(R) Core(TM) i7-1260P
 - **cores**: 12
 - **logicalCpus**: 16
@@ -10,17 +10,16 @@
 - **os**: Microsoft Windows 11 Pro build 26200
 - **powerPlan**: Balanced
 - **pqTestVersion**: 2.155.2.0
-- **odbcDriver**: sqliteodbc 0.99991 (C:\WINDOWS\system32\sqlite3odbc.dll)
-- **office**: none
-- **fixture**: bulk.db, 5.8 MB, sha256 6980ed70eb871c27b6086c6b19d45512ee7831d2459b657dca84c65b0819ed9a
+- **office**: 16.0.20131.20154
+- **overhead**: 2433 ms median (trivial query; subtracted for eval-only)
 
-Median of 5 runs, wall clock per PQTest.exe process, warm cache. Eval = median minus trivial-query overhead.
+Median of 5 runs, wall clock per PQTest.exe process, warm cache.
 
-| case | median (ms) | eval-only (ms) | runs (ms) |
-|---|---:|---:|---|
-| overhead (trivial query) | 3916 | - | 3894, 4030, 3877, 3916, 4171 |
-| sqlite3 driverless | 22358 | 18442 | 21849, 22812, 22358, 22279, 22403 |
-| sqlite3 odbc | 4688 | 772 | 5211, 4732, 4688, 4508, 4526 |
-
-Wall ratio driverless/odbc: 4.77x - eval-only ratio: 23.89x. Both cases returned 800000.
+| pairing | output | driverless wall (ms) | odbc wall (ms) | driverless eval (ms) | odbc eval (ms) | eval ratio |
+|---|---:|---:|---:|---:|---:|---:|
+| sqlite3 | 800000 | 13950 | 3482 | 11517 | 1049 | 10.98x |
+| xlsb | 40000 | 4743 | 3477 | 2310 | 1044 | 2.21x |
+| xls | 24000 | 3676 | 3412 | 1243 | 979 | 1.27x |
+| access | 80000 | 3824 | 3508 | 1391 | 1075 | 1.29x |
+| dbf | 60000 | 3328 | 3586 | 895 | 1153 | 0.78x |
 

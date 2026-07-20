@@ -1,11 +1,12 @@
-# ODBC driver vs driverless connector benchmark. First pairing: sqlite3.
+# ODBC driver vs driverless connector benchmark.
 #
-# Runs the same full-decode query (every cell folded into a non-null count)
-# through PQTest.exe twice: once with the repo's driverless Sqlite3.Database
-# reader (fixture embedded in PQDriverless.mez), once with Odbc.Query through
-# an installed SQLite3 ODBC driver reading the identical file from disk
-# (tests/perf/out/bulk.db - the same bytes the mez embeds). Both sides must
-# return the same value or the run fails.
+# For each pairing below, the same full-decode query (every cell folded into a
+# non-null count) runs through PQTest.exe twice: once with the repo's
+# driverless reader (fixture embedded in PQDriverless.mez), once with
+# Odbc.Query through the installed driver reading the identical file from
+# disk. Both sides must return the same value or the pairing fails. Pairings
+# whose driver or fixture is missing on this machine are recorded as skipped,
+# so partial environments (e.g. no Office) still produce a valid results file.
 #
 # A trivial query is timed as well so eval-only figures can be derived from
 # the wall-clock medians (PQTest.exe pays ~seconds of process startup per run).
@@ -14,9 +15,12 @@
 # hardware and software environment, so runs from different machines can sit
 # side by side in one report.
 #
-# Prereqs: tests/perf/make_perf_fixtures.py then tests/build-mez.ps1 (fixtures
-# are embedded in the mez, so fixtures first), and a 64-bit "SQLite3 ODBC
-# Driver" (sqliteodbc) registered in HKLM.
+# Prereqs, in order (fixtures are embedded in the mez, so fixtures first):
+#   python tests/perf/make_perf_fixtures.py       (bulk.db, bulk.dbf, ...)
+#   pwsh tests/perf/make_ace_fixtures.ps1          (bulk-ace.*; needs Office)
+#   pwsh tests/build-mez.ps1
+# Drivers: sqliteodbc 64-bit for sqlite3; ACE (installed with 64-bit Office)
+# for xls/xlsb/access/dbf.
 #
 # Usage: pwsh tests/perf/run-odbc-benchmark.ps1 [-Runs 5] [-PqTest <path>] [-Mez <path>]
 
@@ -30,8 +34,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$RepoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $TestsDir = Split-Path $PSScriptRoot -Parent
+$PerfOut  = Join-Path $PSScriptRoot "out"
 
 if (-not $PqTest) {
     $found = Get-ChildItem $ToolsDir -Recurse -Filter PQTest.exe -ErrorAction SilentlyContinue |
@@ -41,27 +45,29 @@ if (-not $PqTest) {
 }
 if (-not (Test-Path $Mez)) { throw "$Mez not found. Run tests/build-mez.ps1 first." }
 
-$DbPath = Join-Path $PSScriptRoot "out/bulk.db"
-if (-not (Test-Path $DbPath)) { throw "$DbPath not found. Run tests/perf/make_perf_fixtures.py first." }
+# name, driverless query (repo-relative to tests/perf), odbc template, fixture
+# file the odbc side reads, and the HKLM ODBCINST.INI driver it needs.
+$Pairings = @(
+    @{ Name = "sqlite3"; Driverless = "queries/sqlite3-bulk.query.pq";              Template = "odbc/sqlite3.odbc.query.pq.template";    Fixture = "bulk.db";        DriverKey = "SQLite3 ODBC Driver" }
+    @{ Name = "xlsb";    Driverless = "odbc/pairings/xlsb-ace.driverless.query.pq"; Template = "odbc/xlsb-ace.odbc.query.pq.template";   Fixture = "bulk-ace.xlsb";  DriverKey = "Microsoft Excel Driver (*.xls, *.xlsx, *.xlsm, *.xlsb)" }
+    @{ Name = "xls";     Driverless = "odbc/pairings/xls-ace.driverless.query.pq";  Template = "odbc/xls-ace.odbc.query.pq.template";    Fixture = "bulk-ace.xls";   DriverKey = "Microsoft Excel Driver (*.xls, *.xlsx, *.xlsm, *.xlsb)" }
+    @{ Name = "access";  Driverless = "odbc/pairings/access-ace.driverless.query.pq"; Template = "odbc/access-ace.odbc.query.pq.template"; Fixture = "bulk-ace.accdb"; DriverKey = "Microsoft Access Driver (*.mdb, *.accdb)" }
+    @{ Name = "dbf";     Driverless = "queries/dbf-bulk.query.pq";                  Template = "odbc/dbf.odbc.query.pq.template";        Fixture = "bulk.dbf";       DriverKey = "Microsoft Access dBASE Driver (*.dbf, *.ndx, *.mdx)" }
+)
 
-$OdbcReg = "HKLM:\SOFTWARE\ODBC\ODBCINST.INI\SQLite3 ODBC Driver"
-if (-not (Test-Path $OdbcReg)) { throw "SQLite3 ODBC Driver not registered (64-bit). Install sqliteodbc first." }
-$OdbcDll     = (Get-ItemProperty $OdbcReg).Driver
-$OdbcVersion = (Get-Item $OdbcDll).VersionInfo.FileVersion
+function Get-DriverVersion([string]$Key) {
+    $reg = "HKLM:\SOFTWARE\ODBC\ODBCINST.INI\$Key"
+    if (-not (Test-Path $reg)) { return $null }
+    $dll = (Get-ItemProperty $reg).Driver
+    "{0} ({1})" -f (Get-Item $dll).VersionInfo.FileVersion, $dll
+}
 
 # ---- generated queries (absolute paths, so never committed) ----
 $GenDir = Join-Path $PSScriptRoot "odbc/out"
 New-Item $GenDir -ItemType Directory -Force | Out-Null
 
-$OdbcQuery = Join-Path $GenDir "sqlite3-odbc-bulk.query.pq"
-(Get-Content (Join-Path $PSScriptRoot "odbc/sqlite3-odbc-bulk.query.pq.template") -Raw).
-    Replace("__DB_PATH__", (Resolve-Path $DbPath).Path) |
-    Set-Content $OdbcQuery -Encoding UTF8
-
 $OverheadQuery = Join-Path $GenDir "overhead.query.pq"
 "let one = 1 in one" | Set-Content $OverheadQuery -Encoding UTF8
-
-$DriverlessQuery = Join-Path $PSScriptRoot "queries/sqlite3-bulk.query.pq"
 
 # ---- credentials (anonymous on both sides; validate JSON, not exit codes) ----
 function Set-AnonCredential([string]$Query) {
@@ -71,7 +77,6 @@ function Set-AnonCredential([string]$Query) {
     if ($out -notmatch '"Status"\s*:\s*"Success"') { Write-Host $out; throw "set-credential failed for $Query." }
 }
 Set-AnonCredential (Join-Path $TestsDir "credential.query.pq")
-Set-AnonCredential $OdbcQuery
 
 # ---- timed runs ----
 function Invoke-Timed([string]$Query, [int]$Count) {
@@ -93,19 +98,55 @@ function Invoke-Timed([string]$Query, [int]$Count) {
 }
 
 Write-Host "Benchmarking ($Runs timed runs each, median reported; 1 warmup run per case)..."
-$overhead   = Invoke-Timed $OverheadQuery   $Runs
-$driverless = Invoke-Timed $DriverlessQuery $Runs
-$odbc       = Invoke-Timed $OdbcQuery       $Runs
+$overhead = Invoke-Timed $OverheadQuery $Runs
 
-if ($driverless.Value -ne $odbc.Value) {
-    throw "Output mismatch: driverless=$($driverless.Value) odbc=$($odbc.Value). Not comparable."
+$pairingResults = @()
+foreach ($p in $Pairings) {
+    $fixturePath = Join-Path $PerfOut $p.Fixture
+    $driverVer   = Get-DriverVersion $p.DriverKey
+    if (-not $driverVer -or -not (Test-Path $fixturePath)) {
+        $why = if (-not $driverVer) { "driver '$($p.DriverKey)' not installed" } else { "fixture $($p.Fixture) missing" }
+        Write-Host "[$($p.Name)] SKIPPED: $why"
+        $pairingResults += [ordered]@{ name = $p.Name; status = "skipped"; reason = $why }
+        continue
+    }
+
+    $pairRuns = if ($p.ContainsKey("Runs")) { $p.Runs } else { $Runs }
+    Write-Host "[$($p.Name)] ($pairRuns timed runs)"
+    $odbcQuery = Join-Path $GenDir "$($p.Name).odbc.query.pq"
+    (Get-Content (Join-Path $PSScriptRoot $p.Template) -Raw).
+        Replace("__PERF_OUT__", (Resolve-Path $PerfOut).Path) |
+        Set-Content $odbcQuery -Encoding UTF8
+    Set-AnonCredential $odbcQuery
+
+    $driverless = Invoke-Timed (Join-Path $PSScriptRoot $p.Driverless) $pairRuns
+    $odbc       = Invoke-Timed $odbcQuery $pairRuns
+
+    if ($driverless.Value -ne $odbc.Value) {
+        throw "[$($p.Name)] output mismatch: driverless=$($driverless.Value) odbc=$($odbc.Value). Not comparable."
+    }
+
+    $dlEval = $driverless.MedianMs - $overhead.MedianMs
+    $odEval = [math]::Max(1, $odbc.MedianMs - $overhead.MedianMs)
+    $pairingResults += [ordered]@{
+        name       = $p.Name
+        status     = "measured"
+        runs       = $pairRuns
+        fixture    = "$($p.Fixture), $([math]::Round((Get-Item $fixturePath).Length / 1MB, 1)) MB, sha256 $((Get-FileHash $fixturePath -Algorithm SHA256).Hash.ToLower())"
+        output     = $odbc.Value
+        odbcDriver = $driverVer
+        driverless = [ordered]@{ runsMs = $driverless.RunsMs; medianMs = $driverless.MedianMs; evalMs = $dlEval }
+        odbc       = [ordered]@{ runsMs = $odbc.RunsMs;       medianMs = $odbc.MedianMs;       evalMs = $odbc.MedianMs - $overhead.MedianMs }
+        wallRatio  = [math]::Round($driverless.MedianMs / $odbc.MedianMs, 2)
+        evalRatio  = [math]::Round($dlEval / $odEval, 2)
+    }
 }
 
 # ---- environment ----
 $cpu   = Get-CimInstance Win32_Processor | Select-Object -First 1
 $cs    = Get-CimInstance Win32_ComputerSystem
 $os    = Get-CimInstance Win32_OperatingSystem
-$disk  = try { Get-PhysicalDisk | Where-Object DeviceId -eq ((Get-Partition -DriveLetter ($DbPath[0])).DiskNumber | Select-Object -First 1) | Select-Object -First 1 } catch { $null }
+$disk  = try { Get-PhysicalDisk | Where-Object DeviceId -eq ((Get-Partition -DriveLetter ($PerfOut[0])).DiskNumber | Select-Object -First 1) | Select-Object -First 1 } catch { $null }
 $power = ((powercfg /getactivescheme) -join "") -replace '.*\((.+)\).*', '$1'
 $office = try { (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration" -ErrorAction Stop).VersionToReport } catch { "none" }
 
@@ -120,56 +161,46 @@ $envInfo = [ordered]@{
     os             = "$($os.Caption.Trim()) build $($os.BuildNumber)"
     powerPlan      = $power
     pqTestVersion  = (Get-Item $PqTest).VersionInfo.FileVersion
-    odbcDriver     = "sqliteodbc $OdbcVersion ($OdbcDll)"
     office         = $office
-    fixture        = "bulk.db, $([math]::Round((Get-Item $DbPath).Length / 1MB, 1)) MB, sha256 $((Get-FileHash $DbPath -Algorithm SHA256).Hash.ToLower())"
 }
 
 $report = [ordered]@{
-    schema      = 1
+    schema      = 2
     method      = [ordered]@{
         runs      = $Runs
         statistic = "median"
-        timing    = "wall clock of one PQTest.exe compare per run, warm file cache; includes process startup (see overhead case)"
-        query     = "full decode: List.Sum(List.Transform(Table.ToRows(data), List.NonNullCount)) over 200k rows x 4 cols"
+        timing    = "wall clock of one PQTest.exe compare per run, warm file cache; includes process startup (see overheadMs)"
+        query     = "full decode: List.Sum(List.Transform(Table.ToRows(t), List.NonNullCount)); eval = median - overhead median"
     }
     environment = $envInfo
-    results     = @(
-        [ordered]@{ case = "overhead (trivial query)"; runsMs = $overhead.RunsMs;   medianMs = $overhead.MedianMs;   output = $overhead.Value }
-        [ordered]@{ case = "sqlite3 driverless";       runsMs = $driverless.RunsMs; medianMs = $driverless.MedianMs; output = $driverless.Value }
-        [ordered]@{ case = "sqlite3 odbc";             runsMs = $odbc.RunsMs;       medianMs = $odbc.MedianMs;       output = $odbc.Value }
-    )
-    derived     = [ordered]@{
-        driverlessEvalMs = $driverless.MedianMs - $overhead.MedianMs
-        odbcEvalMs       = $odbc.MedianMs - $overhead.MedianMs
-        wallRatio        = [math]::Round($driverless.MedianMs / $odbc.MedianMs, 2)
-        evalRatio        = [math]::Round(($driverless.MedianMs - $overhead.MedianMs) / [math]::Max(1, $odbc.MedianMs - $overhead.MedianMs), 2)
-    }
+    overheadMs  = [ordered]@{ runsMs = $overhead.RunsMs; medianMs = $overhead.MedianMs }
+    pairings    = $pairingResults
 }
 
 New-Item $OutDir -ItemType Directory -Force | Out-Null
 $jsonPath = Join-Path $OutDir "$($env:COMPUTERNAME).json"
-$report | ConvertTo-Json -Depth 4 | Set-Content $jsonPath -Encoding UTF8
+$report | ConvertTo-Json -Depth 5 | Set-Content $jsonPath -Encoding UTF8
 
 $md = [System.Text.StringBuilder]::new()
 [void]$md.AppendLine("# ODBC vs driverless: $($env:COMPUTERNAME)")
 [void]$md.AppendLine("")
 foreach ($k in $envInfo.Keys) { [void]$md.AppendLine("- **$k**: $($envInfo[$k])") }
+[void]$md.AppendLine("- **overhead**: $($overhead.MedianMs) ms median (trivial query; subtracted for eval-only)")
 [void]$md.AppendLine("")
-[void]$md.AppendLine("Median of $Runs runs, wall clock per PQTest.exe process, warm cache. Eval = median minus trivial-query overhead.")
+[void]$md.AppendLine("Median of $Runs runs, wall clock per PQTest.exe process, warm cache.")
 [void]$md.AppendLine("")
-[void]$md.AppendLine("| case | median (ms) | eval-only (ms) | runs (ms) |")
-[void]$md.AppendLine("|---|---:|---:|---|")
-foreach ($r in $report.results) {
-    $eval = if ($r.case -like "overhead*") { "-" } else { $r.medianMs - $overhead.MedianMs }
-    [void]$md.AppendLine("| $($r.case) | $($r.medianMs) | $eval | $($r.runsMs -join ', ') |")
+[void]$md.AppendLine("| pairing | output | driverless wall (ms) | odbc wall (ms) | driverless eval (ms) | odbc eval (ms) | eval ratio |")
+[void]$md.AppendLine("|---|---:|---:|---:|---:|---:|---:|")
+foreach ($r in $pairingResults) {
+    if ($r.status -eq "skipped") {
+        [void]$md.AppendLine("| $($r.name) | skipped: $($r.reason) | | | | | |")
+    } else {
+        [void]$md.AppendLine("| $($r.name) | $($r.output) | $($r.driverless.medianMs) | $($r.odbc.medianMs) | $($r.driverless.evalMs) | $($r.odbc.evalMs) | $($r.evalRatio)x |")
+    }
 }
-[void]$md.AppendLine("")
-[void]$md.AppendLine("Wall ratio driverless/odbc: $($report.derived.wallRatio)x - eval-only ratio: $($report.derived.evalRatio)x. Both cases returned $($odbc.Value).")
 $mdPath = Join-Path $OutDir "$($env:COMPUTERNAME).md"
 $md.ToString() | Set-Content $mdPath -Encoding UTF8
 
 Write-Host ""
 Write-Host "Wrote $jsonPath"
 Write-Host "Wrote $mdPath"
-
