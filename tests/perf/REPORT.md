@@ -1,12 +1,19 @@
-# ODBC driver vs driverless connector
+# Native decode vs driverless connector
 
-The same full-decode query, the same file, the same harness — once through a
-native ODBC driver, once through the pure-M driverless reader. This report
-grows as pairings and machines are added; per-machine raw data lives in
+The same full-decode workload, the same file, the same harness — once through
+a native decoder, once through the pure-M driverless reader. Two families of
+native decoder are covered: **ODBC drivers** (part 1, for the formats one
+exists for) and **Python/R libraries** (part 2, for the seven formats with no
+mainstream ODBC driver). This report grows as pairings and machines are
+added; per-machine raw data lives in
 `tests/perf/results/<hostname>[-<label>].json+md`.
 
-Updated **21 Jul 2026** · 1 machine · 5 pairings · 2 scales (1x and 10x rows)
-· branch `odbc-vs-driverless` (includes the `61cb250` xlsb fix)
+Updated **21 Jul 2026** · 1 machine · 5 ODBC + 9 script pairings · 2 scales
+(1x and 10x) · the `61cb250` xlsb fix included throughout.
+
+---
+
+# Part 1 — ODBC driver vs driverless connector
 
 ## Key numbers
 
@@ -78,6 +85,11 @@ superlinearity (14.3x); with both scales measured in one session it is 9.7x
 |---|---|---:|---|---|---|---|---|---|
 | WOOM | i7-1260P, 12c/16t | 31.7 GB | Samsung PM9A1 NVMe | Win 11 Pro 26200 | Balanced | 16.0.20131 | sqliteodbc 0.99991 · ACE 16.0.20131 | 2026-07-21 |
 
+Script engines (part 2), same machine: PQTest SDK 2.155.2 · Python 3.12.10
+(pandas 3.0.3, fastavro 1.12.2, pyreadstat 1.3.5, scipy 1.18.0, pyogrio
+0.13.0, evtx 0.12.1) · R 4.6.1 (haven 2.5.5), via the Power BI Desktop script
+providers (SETUP.md §3).
+
 Drift note: on its first day this machine sped up continuously as post-setup
 background work finished (trivial query 3.9 -> 2.4 s, sqlite3 driverless
 eval 18.4 -> 11.5 s between morning and evening — same code, same file).
@@ -139,23 +151,116 @@ The benchmark also pays for itself as a scaling regression test: its first
 10x pass exposed a real superlinear path in the xlsb reader that no
 functional fixture had caught, fixed the same day.
 
+---
+
+# Part 2 — native library vs driverless connector
+
+The seven formats with no mainstream ODBC driver — avro, evtx, stata, spss,
+matlab, gpkg, mbtiles — are compared instead against the best native library,
+driven through the Power Query engine's Python/R script providers (the same
+path `Python.Execute` / `R.Execute` use). Same harness, same file, one
+`PQTest.exe` process per run; the script reads the file from disk and prints
+one parity integer that must match the driverless reader's fold. stata and
+spss are paired against two libraries each (pandas/pyreadstat and R haven), so
+nine pairings in all. Harness: `tests/perf/run-script-benchmark.ps1`.
+
+## Key numbers (10x scale)
+
+- **Native libraries win by 4x–276x** on decode-only time — a far wider gap
+  than ODBC's 2–15x, because these are compiled bulk decoders (GDAL, Rust,
+  pandas' C core) with no per-row bridging cost.
+- **The two extremes are the predicted ones.** evtx **276x** (Rust pyevtx-rs
+  vs interpreted binary-XML template expansion in M) and gpkg **133x**
+  (GDAL/pyogrio WKB decode). The C-backed tabular libraries sit 7x–69x ahead.
+- **Import + marshalling floor: ~3.4–4.5 s per eval** — PQTest startup +
+  interpreter launch + library import + CSV/RData round-trip. This is the
+  script-side analog of the ODBC ~1 s setup floor, but roughly 4x larger, so
+  at 1x scale every C-backed decode finishes inside it. The 10x figures are
+  the meaningful ones.
+- **Output parity: 9/9.** Eight pairings match exact non-null cell/element
+  counts (Tier 1); evtx matches the event count (Tier 2 — the reader flattens
+  each event into its own column set while pyevtx-rs yields raw XML, so cells
+  cannot match). The runner aborts on any mismatch, both scales.
+
+Both scales were measured back-to-back on 21 Jul in one session, so the
+scaling reading is drift-free.
+
+## Results — 10x fixtures (WOOM, 21 Jul 2026)
+
+Median of 5 runs, wall clock per PQTest.exe process, warm cache. Driverless
+eval subtracts the trivial-query floor (2 840 ms this session); native eval
+subtracts the per-pairing imports-only floor (shown). Eval ratios > 1 favour
+the native library — here, always.
+
+| pairing | native library | tier | parity | driverless eval (ms) | native eval (ms) | imports floor (ms) | eval ratio |
+|---|---|---|---:|---:|---:|---:|---:|
+| avro | fastavro | 1 | 6 000 000 | 9 619 | 2 268 | 3 777 | 4.24x |
+| evtx | pyevtx-rs | 2 | 15 000\* | 20 138 | 73 | 3 913 | **275.86x** |
+| stata | pandas | 1 | 2 000 000 | 11 596 | 169 | 3 787 | 68.62x |
+| stata | R haven | 1 | 2 000 000 | 11 596 | 603 | 3 391 | 19.23x |
+| spss | pyreadstat | 1 | 1 600 000 | 15 947 | 858 | 4 232 | 18.59x |
+| spss | R haven | 1 | 1 600 000 | 15 947 | 506 | 4 009 | 31.52x |
+| matlab | scipy | 1 | 1 200 000 | 3 783 | 510 | 4 515 | 7.42x |
+| gpkg | pyogrio | 1 | 600 000 | 16 867 | 127 | 4 456 | **132.81x** |
+| mbtiles | sqlite3 + gzip | 1 | 41 281 308 | 8 475 | 394 | 4 409 | 21.51x |
+
+\* evtx parity is the event count (Tier 2). The driverless side still decodes
+in full — its flattened fold is 240 000 cells at 10x — and that full decode is
+what is timed; only the parity gate uses the structural count.
+
+Two library-vs-library notes fall out of the double pairing: pandas reads the
+500k-row `.dta` **3.6x faster** than R haven (169 vs 603 ms), while haven
+reads the 400k-row `.sav` **1.7x faster** than pyreadstat (506 vs 858 ms).
+
+## 1x scale is floor-bound
+
+At 1x fixtures the imports floor (~3.6–5.3 s) swamps the decode: five of the
+nine native evals finish inside the noise and clamp to ~0, so their ratios
+are not meaningful. Only avro (6.3x), stata-R (9.4x), spss-Python (10.6x) and
+mbtiles (1.9x) resolve above the floor — the readers whose native side does
+real per-record Python work (fastavro object build, haven, pyreadstat, the
+per-tile gzip loop) rather than a pure C bulk read. Driverless eval scales
+broadly linearly 1x→10x (4.8x–9.4x for 10x rows/records/vars; the 1x term is
+itself overhead-sensitive). Full 1x data: `results/WOOM-scripts.json`.
+
+## Reading the result
+
+Where a mature native library exists, it decodes these formats far faster
+than interpreted M — 4x for avro, ~20–70x for the tabular stats formats,
+130–280x for the GDAL- and Rust-backed readers. That is the honest cost of a
+zero-dependency pure-M reader: it trades decode throughput for running
+**anywhere M runs, with nothing to install** — no Python, no R, no GDAL, no
+gateway, no bitness or provider-registration concerns. This benchmark's own
+native column could not exist until a full Power BI Desktop install had
+registered the script providers (SETUP.md §3); the driverless column needs
+only the mez. For a one-off import of a modest file the difference is
+sub-second and moot; for repeated decode of large files in an environment
+that can carry the toolchain, the native library is the right tool. Pick by
+file size, repetition, and whether the environment can hold the dependency.
+
 ## Pairings — status
 
-| format | driverless reader | driver counterpart | status |
+| format | driverless reader | native counterpart | status |
 |---|---|---|---|
-| sqlite3 | `Sqlite3.Database` | sqliteodbc (Werner) | measured |
-| xlsb | `Xlsb.Workbook` | ACE Excel ODBC | measured (post-fix) |
-| xls | `Xls.Workbook` | ACE Excel ODBC | measured |
-| access | `AccessReader.Database` | ACE Access ODBC | measured |
-| dbf | `Dbf.Table` | ACE dBASE ODBC | measured |
-| avro · evtx · stata · spss · matlab · gpkg · mbtiles | — | no mainstream ODBC counterpart | driverless-only |
+| sqlite3 | `Sqlite3.Database` | sqliteodbc (Werner) | measured (ODBC) |
+| xlsb | `Xlsb.Workbook` | ACE Excel ODBC | measured (ODBC, post-fix) |
+| xls | `Xls.Workbook` | ACE Excel ODBC | measured (ODBC) |
+| access | `AccessReader.Database` | ACE Access ODBC | measured (ODBC) |
+| dbf | `Dbf.Table` | ACE dBASE ODBC | measured (ODBC) |
+| avro | `Avro.Document` | fastavro (Python) | measured (script) |
+| evtx | `Evtx.Document` | pyevtx-rs (Python) | measured (script) |
+| stata | `Stata.Document` | pandas · R haven | measured (script) |
+| spss | `Spss.Document` | pyreadstat · R haven | measured (script) |
+| matlab | `Matlab.Document` | scipy (Python) | measured (script) |
+| gpkg | `Gpkg.Database` | pyogrio/GDAL (Python) | measured (script) |
+| mbtiles | `Mbtiles.Document` | sqlite3 + gzip (Python) | measured (script) |
 
 Next: more machines — each adds an Environments row and results files
-(`<hostname>` and `<hostname>-10x`) to the repo.
+(`<hostname>[-scripts][-10x]`) to the repo.
 
 ---
 
-Harness: `tests/perf/run-odbc-benchmark.ps1` on branch `odbc-vs-driverless` ·
-results committed per machine under `tests/perf/results/` · timings are wall
-clock, not micro-benchmarks — treat single-digit-percent differences as
-noise.
+Harness: `tests/perf/run-odbc-benchmark.ps1` (part 1) and
+`run-script-benchmark.ps1` (part 2) · results committed per machine under
+`tests/perf/results/` · timings are wall clock, not micro-benchmarks — treat
+single-digit-percent differences as noise.
