@@ -9,7 +9,7 @@
   },
   "environment": {
     "machine": "WOOM",
-    "timestamp": "2026-07-20T22:20:54+01:00",
+    "timestamp": "2026-07-21T13:07:55+01:00",
     "cpu": "12th Gen Intel(R) Core(TM) i7-1260P",
     "cores": 12,
     "logicalCpus": 16,
@@ -22,13 +22,13 @@
   },
   "overheadMs": {
     "runsMs": [
-      3683.0,
-      3740.0,
-      3759.0,
-      3762.0,
-      3852.0
+      2795.0,
+      2638.0,
+      2500.0,
+      2484.0,
+      2517.0
     ],
-    "medianMs": 3759.0
+    "medianMs": 2517.0
   },
   "pairings": [
     {
@@ -40,28 +40,28 @@
       "odbcDriver": "0.99991 (C:\\WINDOWS\\system32\\sqlite3odbc.dll)",
       "driverless": {
         "runsMs": [
-          167013.0,
-          168870.0,
-          168966.0,
-          164158.0,
-          204957.0
+          116328.0,
+          117603.0,
+          124222.0,
+          117796.0,
+          116271.0
         ],
-        "medianMs": 168870.0,
-        "evalMs": 165111.0
+        "medianMs": 117603.0,
+        "evalMs": 115086.0
       },
       "odbc": {
         "runsMs": [
-          12895.0,
-          12719.0,
-          12861.0,
-          12858.0,
-          12845.0
+          10081.0,
+          10035.0,
+          9902.0,
+          10325.0,
+          10744.0
         ],
-        "medianMs": 12858.0,
-        "evalMs": 9099.0
+        "medianMs": 10081.0,
+        "evalMs": 7564.0
       },
-      "wallRatio": 13.13,
-      "evalRatio": 18.15
+      "wallRatio": 11.67,
+      "evalRatio": 15.21
     },
     {
       "name": "xlsb",
@@ -72,28 +72,28 @@
       "odbcDriver": "16.0.20131.20012 (C:\\Program Files\\Microsoft Office\\root\\VFS\\ProgramFilesCommonX64\\Microsoft Shared\\Office16\\ACEODBC.DLL)",
       "driverless": {
         "runsMs": [
-          45704.0,
-          44112.0,
-          44505.0,
-          43223.0,
-          44583.0
+          25650.0,
+          24515.0,
+          25386.0,
+          25111.0,
+          25804.0
         ],
-        "medianMs": 44505.0,
-        "evalMs": 40746.0
+        "medianMs": 25386.0,
+        "evalMs": 22869.0
       },
       "odbc": {
         "runsMs": [
-          6488.0,
-          6553.0,
-          6526.0,
-          6454.0,
-          6712.0
+          4786.0,
+          4795.0,
+          4962.0,
+          4808.0,
+          4857.0
         ],
-        "medianMs": 6526.0,
-        "evalMs": 2767.0
+        "medianMs": 4808.0,
+        "evalMs": 2291.0
       },
-      "wallRatio": 6.82,
-      "evalRatio": 14.73
+      "wallRatio": 5.28,
+      "evalRatio": 9.98
     },
     {
       "name": "xls",
@@ -104,28 +104,28 @@
       "odbcDriver": "16.0.20131.20012 (C:\\Program Files\\Microsoft Office\\root\\VFS\\ProgramFilesCommonX64\\Microsoft Shared\\Office16\\ACEODBC.DLL)",
       "driverless": {
         "runsMs": [
-          14181.0,
-          14011.0,
-          13810.0,
-          13815.0,
-          13791.0
+          10857.0,
+          10797.0,
+          10900.0,
+          10911.0,
+          10496.0
         ],
-        "medianMs": 13815.0,
-        "evalMs": 10056.0
+        "medianMs": 10857.0,
+        "evalMs": 8340.0
       },
       "odbc": {
         "runsMs": [
-          4693.0,
-          4683.0,
-          4592.0,
-          4717.0,
-          4711.0
+          3641.0,
+          3619.0,
+          3654.0,
+          3623.0,
+          3626.0
         ],
-        "medianMs": 4693.0,
-        "evalMs": 934.0
+        "medianMs": 3626.0,
+        "evalMs": 1109.0
       },
-      "wallRatio": 2.94,
-      "evalRatio": 10.77
+      "wallRatio": 2.99,
+      "evalRatio": 7.52
     },
     {
       "name": "access",
@@ -136,28 +136,28 @@
       "odbcDriver": "16.0.20131.20012 (C:\\Program Files\\Microsoft Office\\root\\VFS\\ProgramFilesCommonX64\\Microsoft Shared\\Office16\\ACEODBC.DLL)",
       "driverless": {
         "runsMs": [
-          17715.0,
-          17024.0,
-          17340.0,
-          17183.0,
-          17251.0
+          13384.0,
+          13247.0,
+          13150.0,
+          14293.0,
+          13740.0
         ],
-        "medianMs": 17251.0,
-        "evalMs": 13492.0
+        "medianMs": 13384.0,
+        "evalMs": 10867.0
       },
       "odbc": {
         "runsMs": [
-          5375.0,
-          5242.0,
-          5268.0,
-          5373.0,
-          5249.0
+          4435.0,
+          4118.0,
+          4132.0,
+          4126.0,
+          4151.0
         ],
-        "medianMs": 5268.0,
-        "evalMs": 1509.0
+        "medianMs": 4132.0,
+        "evalMs": 1615.0
       },
-      "wallRatio": 3.27,
-      "evalRatio": 8.94
+      "wallRatio": 3.24,
+      "evalRatio": 6.73
     },
     {
       "name": "dbf",
@@ -168,28 +168,28 @@
       "odbcDriver": "16.0.20131.20012 (C:\\Program Files\\Microsoft Office\\root\\VFS\\ProgramFilesCommonX64\\Microsoft Shared\\Office16\\ACEODBC.DLL)",
       "driverless": {
         "runsMs": [
-          10359.0,
-          10264.0,
-          10805.0,
-          10572.0,
-          10319.0
+          8068.0,
+          8237.0,
+          8312.0,
+          8332.0,
+          8387.0
         ],
-        "medianMs": 10359.0,
-        "evalMs": 6600.0
+        "medianMs": 8312.0,
+        "evalMs": 5795.0
       },
       "odbc": {
         "runsMs": [
-          6266.0,
-          6273.0,
-          6227.0,
-          6223.0,
-          6248.0
+          5166.0,
+          4990.0,
+          5088.0,
+          5309.0,
+          4976.0
         ],
-        "medianMs": 6248.0,
-        "evalMs": 2489.0
+        "medianMs": 5088.0,
+        "evalMs": 2571.0
       },
-      "wallRatio": 1.66,
-      "evalRatio": 2.65
+      "wallRatio": 1.63,
+      "evalRatio": 2.25
     }
   ]
 }

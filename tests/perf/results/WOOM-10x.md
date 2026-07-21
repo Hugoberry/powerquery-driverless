@@ -1,7 +1,7 @@
 # ODBC vs driverless: WOOM-10x
 
 - **machine**: WOOM
-- **timestamp**: 2026-07-20T22:20:54+01:00
+- **timestamp**: 2026-07-21T13:07:55+01:00
 - **cpu**: 12th Gen Intel(R) Core(TM) i7-1260P
 - **cores**: 12
 - **logicalCpus**: 16
@@ -11,15 +11,15 @@
 - **powerPlan**: Balanced
 - **pqTestVersion**: 2.155.2.0
 - **office**: 16.0.20131.20154
-- **overhead**: 3759 ms median (trivial query; subtracted for eval-only)
+- **overhead**: 2517 ms median (trivial query; subtracted for eval-only)
 
 Median of 5 runs, wall clock per PQTest.exe process, warm cache.
 
 | pairing | output | driverless wall (ms) | odbc wall (ms) | driverless eval (ms) | odbc eval (ms) | eval ratio |
 |---|---:|---:|---:|---:|---:|---:|
-| sqlite3 | 8000000 | 168870 | 12858 | 165111 | 9099 | 18.15x |
-| xlsb | 400000 | 44505 | 6526 | 40746 | 2767 | 14.73x |
-| xls | 195000 | 13815 | 4693 | 10056 | 934 | 10.77x |
-| access | 800000 | 17251 | 5268 | 13492 | 1509 | 8.94x |
-| dbf | 600000 | 10359 | 6248 | 6600 | 2489 | 2.65x |
+| sqlite3 | 8000000 | 117603 | 10081 | 115086 | 7564 | 15.21x |
+| xlsb | 400000 | 25386 | 4808 | 22869 | 2291 | 9.98x |
+| xls | 195000 | 10857 | 3626 | 8340 | 1109 | 7.52x |
+| access | 800000 | 13384 | 4132 | 10867 | 1615 | 6.73x |
+| dbf | 600000 | 8312 | 5088 | 5795 | 2571 | 2.25x |
 
