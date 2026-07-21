@@ -17,6 +17,7 @@ hand-crafted writers in each reader's test/make_fixtures.py.
 """
 import argparse
 import datetime
+import gzip
 import importlib.util
 import json
 import os
@@ -517,6 +518,49 @@ def make_gpkg(path: str, rows: int) -> None:
     con.close()
 
 
+# ---------------------------------------------------------------- mbtiles
+# MBTiles: a SQLite container of map tiles. The per-tile work under test is
+# Mbtiles.Document's gzip auto-decompression of vector (pbf) tiles, so every
+# tile_data blob is a gzip-compressed synthetic MVT payload. Plain `tiles`
+# table layout (MBTiles 1.x); the driverless reader returns decompressed
+# blobs, which the native side (sqlite3 + gzip) reproduces exactly.
+
+def make_mbtiles(path: str, tiles: int) -> None:
+    if os.path.exists(path):
+        os.remove(path)
+    con = sqlite3.connect(path)
+    cur = con.cursor()
+    cur.execute("CREATE TABLE metadata (name TEXT, value TEXT)")
+    cur.executemany("INSERT INTO metadata VALUES (?,?)", [
+        ("name", "perf-bulk"),
+        ("format", "pbf"),
+        ("minzoom", "10"),
+        ("maxzoom", "10"),
+        ("bounds", "-180.0,-85.0,180.0,85.0"),
+        ("type", "overlay"),
+        ("version", "1.0"),
+    ])
+    cur.execute("""CREATE TABLE tiles (
+        zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER,
+        tile_data BLOB,
+        PRIMARY KEY (zoom_level, tile_column, tile_row))""")
+    rng = random.Random(42)
+    z, width = 10, 1024                     # tile_column/tile_row both < 2^10
+
+    def rows():
+        for i in range(tiles):
+            # synthetic MVT-ish payload: a coordinate tag plus a fixed run of
+            # pseudo-random bytes, gzip-compressed as the spec requires.
+            x, y = i // width, i % width
+            payload = (("t-%d-%d-%d-" % (z, x, y)).encode()
+                       + bytes(rng.randrange(256) for _ in range(400)))
+            yield (z, x, y, gzip.compress(payload, 6))
+
+    cur.executemany("INSERT INTO tiles VALUES (?,?,?,?)", rows())
+    con.commit()
+    con.close()
+
+
 # ---------------------------------------------------------------- main
 
 def main() -> None:
@@ -532,6 +576,7 @@ def main() -> None:
     ap.add_argument("--evtx-records", type=int, default=1_500)
     ap.add_argument("--avro-rows", type=int, default=150_000)
     ap.add_argument("--gpkg-rows", type=int, default=15_000)
+    ap.add_argument("--mbtiles-tiles", type=int, default=10_000)
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
@@ -546,6 +591,7 @@ def main() -> None:
         ("bulk.evtx", make_evtx, args.evtx_records),
         ("bulk.avro", make_avro, args.avro_rows),
         ("bulk.gpkg", make_gpkg, args.gpkg_rows),
+        ("bulk.mbtiles", make_mbtiles, args.mbtiles_tiles),
     ]
     for name, fn, n in jobs:
         p = os.path.join(args.out, name)
