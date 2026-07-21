@@ -6,4 +6,5 @@ tests/out/
 tests/perf/out/
 tests/perf/queries/*.pqout
 tests/perf/odbc/out/
+tests/perf/scripts/out/
 .pqtools/

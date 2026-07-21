@@ -1,0 +1,435 @@
+{
+  "schema": 2,
+  "method": {
+    "label": "10x",
+    "runs": 5,
+    "statistic": "median",
+    "timing": "wall clock of one PQTest.exe compare per run, warm file cache; includes process startup (see overheadMs) and, for scripts, interpreter launch + import + CSV/RData marshalling (see per-pairing importsOverhead)",
+    "query": "driverless: full-decode fold; script: same workload in Python/R printing one parity integer (Tier 1 exact cell parity, Tier 2 structural). driverless eval = median - overhead; script eval = median - importsOverhead",
+    "route": "A: scripts run inside the PQ engine via the Python/R ADO.NET providers (context/SCRIPT-PERF-SPEC.md)"
+  },
+  "environment": {
+    "machine": "WOOM",
+    "timestamp": "2026-07-21T20:11:27+01:00",
+    "cpu": "12th Gen Intel(R) Core(TM) i7-1260P",
+    "cores": 12,
+    "logicalCpus": 16,
+    "ramGB": 31.7,
+    "disk": "SAMSUNG MZVL21T0HCLR-00BL7 (SSD, NVMe)",
+    "os": "Microsoft Windows 11 Pro build 26200",
+    "powerPlan": "Balanced",
+    "pqTestVersion": "2.155.2.0",
+    "pythonVersion": "3.12.10",
+    "pythonLibs": "pandas 3.0.3; fastavro 1.12.2; pyreadstat 1.3.5; scipy 1.18.0; pyogrio 0.13.0; evtx 0.12.1",
+    "rVersion": "4.6.1",
+    "havenVersion": "2.5.5"
+  },
+  "overheadMs": {
+    "runsMs": [
+      2698.0,
+      2840.0,
+      2740.0,
+      2916.0,
+      2842.0
+    ],
+    "medianMs": 2840.0
+  },
+  "pairings": [
+    {
+      "name": "avro",
+      "engine": "python",
+      "status": "measured",
+      "parityTier": 1,
+      "fixture": "bulk.avro, 34.8 MB, sha256 2cf4eb1120e581aeba4b0f96201376c583fd5c1d2111f0f3a27602fe762f8838",
+      "parityValue": "6000000",
+      "driverlessValue": "6000000",
+      "scriptValue": "6000000",
+      "driverless": {
+        "runsMs": [
+          12736.0,
+          12459.0,
+          12404.0,
+          12568.0,
+          12439.0
+        ],
+        "medianMs": 12459.0,
+        "evalMs": 9619.0
+      },
+      "script": {
+        "runsMs": [
+          6061.0,
+          5962.0,
+          6045.0,
+          5980.0,
+          6066.0
+        ],
+        "medianMs": 6045.0,
+        "evalMs": 2268
+      },
+      "importsOverhead": {
+        "runsMs": [
+          3708.0,
+          3747.0,
+          3793.0,
+          3778.0,
+          3777.0
+        ],
+        "medianMs": 3777.0
+      },
+      "wallRatio": 2.06,
+      "evalRatio": 4.24
+    },
+    {
+      "name": "evtx",
+      "engine": "python",
+      "status": "measured",
+      "parityTier": 2,
+      "fixture": "bulk.evtx, 5.3 MB, sha256 6f315672182893e6e61df7dd4791b952a9de69a5e633b8f3e9708119a948f71d",
+      "parityValue": "15000",
+      "driverlessValue": "240000",
+      "scriptValue": "15000",
+      "driverless": {
+        "runsMs": [
+          22978.0,
+          22602.0,
+          24711.0,
+          836320.0,
+          21953.0
+        ],
+        "medianMs": 22978.0,
+        "evalMs": 20138.0
+      },
+      "script": {
+        "runsMs": [
+          4031.0,
+          3986.0,
+          3874.0,
+          4000.0,
+          3763.0
+        ],
+        "medianMs": 3986.0,
+        "evalMs": 73
+      },
+      "importsOverhead": {
+        "runsMs": [
+          3913.0,
+          4410.0,
+          4053.0,
+          3763.0,
+          3712.0
+        ],
+        "medianMs": 3913.0
+      },
+      "wallRatio": 5.76,
+      "evalRatio": 275.86
+    },
+    {
+      "name": "stata",
+      "engine": "python",
+      "status": "measured",
+      "parityTier": 1,
+      "fixture": "bulk.dta, 17.6 MB, sha256 a9e3e81f046956d9635e3aed066e0961fca77d67d067edc946c7f63a338859ec",
+      "parityValue": "2000000",
+      "driverlessValue": "2000000",
+      "scriptValue": "2000000",
+      "driverless": {
+        "runsMs": [
+          14483.0,
+          14193.0,
+          14552.0,
+          14128.0,
+          14436.0
+        ],
+        "medianMs": 14436.0,
+        "evalMs": 11596.0
+      },
+      "script": {
+        "runsMs": [
+          3956.0,
+          3968.0,
+          3920.0,
+          4018.0,
+          3943.0
+        ],
+        "medianMs": 3956.0,
+        "evalMs": 169
+      },
+      "importsOverhead": {
+        "runsMs": [
+          3787.0,
+          3823.0,
+          3786.0,
+          3765.0,
+          3802.0
+        ],
+        "medianMs": 3787.0
+      },
+      "wallRatio": 3.65,
+      "evalRatio": 68.62
+    },
+    {
+      "name": "stata",
+      "engine": "r",
+      "status": "measured",
+      "parityTier": 1,
+      "fixture": "bulk.dta, 17.6 MB, sha256 a9e3e81f046956d9635e3aed066e0961fca77d67d067edc946c7f63a338859ec",
+      "parityValue": "2000000",
+      "driverlessValue": "2000000",
+      "scriptValue": "2000000",
+      "driverless": {
+        "runsMs": [
+          14483.0,
+          14193.0,
+          14552.0,
+          14128.0,
+          14436.0
+        ],
+        "medianMs": 14436.0,
+        "evalMs": 11596.0
+      },
+      "script": {
+        "runsMs": [
+          3989.0,
+          3994.0,
+          3967.0,
+          4191.0,
+          4000.0
+        ],
+        "medianMs": 3994.0,
+        "evalMs": 603
+      },
+      "importsOverhead": {
+        "runsMs": [
+          3467.0,
+          3390.0,
+          3386.0,
+          3397.0,
+          3391.0
+        ],
+        "medianMs": 3391.0
+      },
+      "wallRatio": 3.61,
+      "evalRatio": 19.23
+    },
+    {
+      "name": "spss",
+      "engine": "python",
+      "status": "measured",
+      "parityTier": 1,
+      "fixture": "bulk.sav, 15.3 MB, sha256 d4374275d592ae848044fe7d8a52906840be70d9d2cade0603d6fce9705bf569",
+      "parityValue": "1600000",
+      "driverlessValue": "1600000",
+      "scriptValue": "1600000",
+      "driverless": {
+        "runsMs": [
+          18787.0,
+          19077.0,
+          17393.0,
+          18419.0,
+          18875.0
+        ],
+        "medianMs": 18787.0,
+        "evalMs": 15947.0
+      },
+      "script": {
+        "runsMs": [
+          5090.0,
+          5075.0,
+          5088.0,
+          5422.0,
+          5427.0
+        ],
+        "medianMs": 5090.0,
+        "evalMs": 858
+      },
+      "importsOverhead": {
+        "runsMs": [
+          4199.0,
+          4232.0,
+          4216.0,
+          4499.0,
+          4451.0
+        ],
+        "medianMs": 4232.0
+      },
+      "wallRatio": 3.69,
+      "evalRatio": 18.59
+    },
+    {
+      "name": "spss",
+      "engine": "r",
+      "status": "measured",
+      "parityTier": 1,
+      "fixture": "bulk.sav, 15.3 MB, sha256 d4374275d592ae848044fe7d8a52906840be70d9d2cade0603d6fce9705bf569",
+      "parityValue": "1600000",
+      "driverlessValue": "1600000",
+      "scriptValue": "1600000",
+      "driverless": {
+        "runsMs": [
+          18787.0,
+          19077.0,
+          17393.0,
+          18419.0,
+          18875.0
+        ],
+        "medianMs": 18787.0,
+        "evalMs": 15947.0
+      },
+      "script": {
+        "runsMs": [
+          4515.0,
+          4386.0,
+          4437.0,
+          4790.0,
+          4703.0
+        ],
+        "medianMs": 4515.0,
+        "evalMs": 506
+      },
+      "importsOverhead": {
+        "runsMs": [
+          3939.0,
+          3935.0,
+          4009.0,
+          4082.0,
+          4484.0
+        ],
+        "medianMs": 4009.0
+      },
+      "wallRatio": 4.16,
+      "evalRatio": 31.52
+    },
+    {
+      "name": "matlab",
+      "engine": "python",
+      "status": "measured",
+      "parityTier": 1,
+      "fixture": "bulk.mat, 9.5 MB, sha256 1e08c4ab02b6c5e1adc14da13916d43f183f471d3de7f7f96ca0cabd8016a5cc",
+      "parityValue": "1200000",
+      "driverlessValue": "1200000",
+      "scriptValue": "1200000",
+      "driverless": {
+        "runsMs": [
+          6562.0,
+          6577.0,
+          6755.0,
+          7231.0,
+          6623.0
+        ],
+        "medianMs": 6623.0,
+        "evalMs": 3783.0
+      },
+      "script": {
+        "runsMs": [
+          4605.0,
+          4795.0,
+          5025.0,
+          5404.0,
+          5455.0
+        ],
+        "medianMs": 5025.0,
+        "evalMs": 510
+      },
+      "importsOverhead": {
+        "runsMs": [
+          4515.0,
+          4802.0,
+          4939.0,
+          4408.0,
+          4423.0
+        ],
+        "medianMs": 4515.0
+      },
+      "wallRatio": 1.32,
+      "evalRatio": 7.42
+    },
+    {
+      "name": "gpkg",
+      "engine": "python",
+      "status": "measured",
+      "parityTier": 1,
+      "fixture": "bulk.gpkg, 8.4 MB, sha256 59b15508b1f8ddb1c00751b087085c934b8880d32f4d268f7760cd17f4da7b4d",
+      "parityValue": "600000",
+      "driverlessValue": "600000",
+      "scriptValue": "600000",
+      "driverless": {
+        "runsMs": [
+          19233.0,
+          21773.0,
+          19988.0,
+          19197.0,
+          19707.0
+        ],
+        "medianMs": 19707.0,
+        "evalMs": 16867.0
+      },
+      "script": {
+        "runsMs": [
+          4532.0,
+          4952.0,
+          4714.0,
+          4541.0,
+          4583.0
+        ],
+        "medianMs": 4583.0,
+        "evalMs": 127
+      },
+      "importsOverhead": {
+        "runsMs": [
+          4484.0,
+          4456.0,
+          4756.0,
+          4345.0,
+          4308.0
+        ],
+        "medianMs": 4456.0
+      },
+      "wallRatio": 4.3,
+      "evalRatio": 132.81
+    },
+    {
+      "name": "mbtiles",
+      "engine": "python",
+      "status": "measured",
+      "parityTier": 1,
+      "fixture": "bulk.mbtiles, 45.1 MB, sha256 53c0e036f08cdcb5b07dd45903a11b2e54685c4a3b38feb29072fea9f3bbc63f",
+      "parityValue": "41281308",
+      "driverlessValue": "41281308",
+      "scriptValue": "41281308",
+      "driverless": {
+        "runsMs": [
+          12329.0,
+          11238.0,
+          11033.0,
+          12108.0,
+          11315.0
+        ],
+        "medianMs": 11315.0,
+        "evalMs": 8475.0
+      },
+      "script": {
+        "runsMs": [
+          5280.0,
+          4803.0,
+          4774.0,
+          4763.0,
+          4955.0
+        ],
+        "medianMs": 4803.0,
+        "evalMs": 394
+      },
+      "importsOverhead": {
+        "runsMs": [
+          5006.0,
+          4409.0,
+          4352.0,
+          4366.0,
+          4514.0
+        ],
+        "medianMs": 4409.0
+      },
+      "wallRatio": 2.36,
+      "evalRatio": 21.51
+    }
+  ]
+}
