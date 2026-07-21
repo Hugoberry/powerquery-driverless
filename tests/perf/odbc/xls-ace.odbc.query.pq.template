@@ -1,0 +1,4 @@
+let
+    Data = Odbc.Query("Driver={Microsoft Excel Driver (*.xls, *.xlsx, *.xlsm, *.xlsb)};DBQ=__PERF_OUT__\bulk-ace.xls;ReadOnly=1", "SELECT * FROM [Bulk$]")
+in
+    List.Sum(List.Transform(Table.ToRows(Data), List.NonNullCount))

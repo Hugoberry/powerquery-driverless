@@ -1,0 +1,4 @@
+let
+    Data = Odbc.Query("Driver={Microsoft Access dBASE Driver (*.dbf, *.ndx, *.mdx)};DefaultDir=__PERF_OUT__", "SELECT * FROM [bulk]")
+in
+    List.Sum(List.Transform(Table.ToRows(Data), List.NonNullCount))

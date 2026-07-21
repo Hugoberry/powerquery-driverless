@@ -1,0 +1,195 @@
+{
+  "schema": 2,
+  "method": {
+    "label": "10x",
+    "runs": 5,
+    "statistic": "median",
+    "timing": "wall clock of one PQTest.exe compare per run, warm file cache; includes process startup (see overheadMs)",
+    "query": "full decode: List.Sum(List.Transform(Table.ToRows(t), List.NonNullCount)); eval = median - overhead median"
+  },
+  "environment": {
+    "machine": "WOOM",
+    "timestamp": "2026-07-21T13:07:55+01:00",
+    "cpu": "12th Gen Intel(R) Core(TM) i7-1260P",
+    "cores": 12,
+    "logicalCpus": 16,
+    "ramGB": 31.7,
+    "disk": "SAMSUNG MZVL21T0HCLR-00BL7 (SSD, NVMe)",
+    "os": "Microsoft Windows 11 Pro build 26200",
+    "powerPlan": "Balanced",
+    "pqTestVersion": "2.155.2.0",
+    "office": "16.0.20131.20154"
+  },
+  "overheadMs": {
+    "runsMs": [
+      2795.0,
+      2638.0,
+      2500.0,
+      2484.0,
+      2517.0
+    ],
+    "medianMs": 2517.0
+  },
+  "pairings": [
+    {
+      "name": "sqlite3",
+      "status": "measured",
+      "runs": 5,
+      "fixture": "bulk.db, 57.6 MB, sha256 29f16049f4e1ee7d07ef4722f7dc5cfcabea6422252bc92ce679d01f5285a658",
+      "output": "8000000",
+      "odbcDriver": "0.99991 (C:\\WINDOWS\\system32\\sqlite3odbc.dll)",
+      "driverless": {
+        "runsMs": [
+          116328.0,
+          117603.0,
+          124222.0,
+          117796.0,
+          116271.0
+        ],
+        "medianMs": 117603.0,
+        "evalMs": 115086.0
+      },
+      "odbc": {
+        "runsMs": [
+          10081.0,
+          10035.0,
+          9902.0,
+          10325.0,
+          10744.0
+        ],
+        "medianMs": 10081.0,
+        "evalMs": 7564.0
+      },
+      "wallRatio": 11.67,
+      "evalRatio": 15.21
+    },
+    {
+      "name": "xlsb",
+      "status": "measured",
+      "runs": 5,
+      "fixture": "bulk-ace.xlsb, 1 MB, sha256 ced078f98ea1d9932d701fc9672d875af02405349a9655a346648b31b6403b29",
+      "output": "400000",
+      "odbcDriver": "16.0.20131.20012 (C:\\Program Files\\Microsoft Office\\root\\VFS\\ProgramFilesCommonX64\\Microsoft Shared\\Office16\\ACEODBC.DLL)",
+      "driverless": {
+        "runsMs": [
+          25650.0,
+          24515.0,
+          25386.0,
+          25111.0,
+          25804.0
+        ],
+        "medianMs": 25386.0,
+        "evalMs": 22869.0
+      },
+      "odbc": {
+        "runsMs": [
+          4786.0,
+          4795.0,
+          4962.0,
+          4808.0,
+          4857.0
+        ],
+        "medianMs": 4808.0,
+        "evalMs": 2291.0
+      },
+      "wallRatio": 5.28,
+      "evalRatio": 9.98
+    },
+    {
+      "name": "xls",
+      "status": "measured",
+      "runs": 5,
+      "fixture": "bulk-ace.xls, 3.7 MB, sha256 3fbd288112e0ee1b495208af91f4dfc08438ad2d3a89cb00f344dd4b6429b338",
+      "output": "195000",
+      "odbcDriver": "16.0.20131.20012 (C:\\Program Files\\Microsoft Office\\root\\VFS\\ProgramFilesCommonX64\\Microsoft Shared\\Office16\\ACEODBC.DLL)",
+      "driverless": {
+        "runsMs": [
+          10857.0,
+          10797.0,
+          10900.0,
+          10911.0,
+          10496.0
+        ],
+        "medianMs": 10857.0,
+        "evalMs": 8340.0
+      },
+      "odbc": {
+        "runsMs": [
+          3641.0,
+          3619.0,
+          3654.0,
+          3623.0,
+          3626.0
+        ],
+        "medianMs": 3626.0,
+        "evalMs": 1109.0
+      },
+      "wallRatio": 2.99,
+      "evalRatio": 7.52
+    },
+    {
+      "name": "access",
+      "status": "measured",
+      "runs": 5,
+      "fixture": "bulk-ace.accdb, 9.6 MB, sha256 50e7cc0e9fd64218a21560bbd3a7f539797429123485f5003867af678dc74dcd",
+      "output": "800000",
+      "odbcDriver": "16.0.20131.20012 (C:\\Program Files\\Microsoft Office\\root\\VFS\\ProgramFilesCommonX64\\Microsoft Shared\\Office16\\ACEODBC.DLL)",
+      "driverless": {
+        "runsMs": [
+          13384.0,
+          13247.0,
+          13150.0,
+          14293.0,
+          13740.0
+        ],
+        "medianMs": 13384.0,
+        "evalMs": 10867.0
+      },
+      "odbc": {
+        "runsMs": [
+          4435.0,
+          4118.0,
+          4132.0,
+          4126.0,
+          4151.0
+        ],
+        "medianMs": 4132.0,
+        "evalMs": 1615.0
+      },
+      "wallRatio": 3.24,
+      "evalRatio": 6.73
+    },
+    {
+      "name": "dbf",
+      "status": "measured",
+      "runs": 5,
+      "fixture": "bulk.dbf, 8.2 MB, sha256 2ab11f16a3bef306f6b1b63b4388d155c138cca78dbf8fdacfea682b3894cbe0",
+      "output": "600000",
+      "odbcDriver": "16.0.20131.20012 (C:\\Program Files\\Microsoft Office\\root\\VFS\\ProgramFilesCommonX64\\Microsoft Shared\\Office16\\ACEODBC.DLL)",
+      "driverless": {
+        "runsMs": [
+          8068.0,
+          8237.0,
+          8312.0,
+          8332.0,
+          8387.0
+        ],
+        "medianMs": 8312.0,
+        "evalMs": 5795.0
+      },
+      "odbc": {
+        "runsMs": [
+          5166.0,
+          4990.0,
+          5088.0,
+          5309.0,
+          4976.0
+        ],
+        "medianMs": 5088.0,
+        "evalMs": 2571.0
+      },
+      "wallRatio": 1.63,
+      "evalRatio": 2.25
+    }
+  ]
+}
