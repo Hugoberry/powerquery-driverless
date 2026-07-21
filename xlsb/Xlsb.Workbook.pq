@@ -373,30 +373,61 @@ let
     GridFromCells = (cells0 as list) as table =>
         let
             cells = List.Buffer(cells0),
-            ncols = if List.IsEmpty(cells) then 0
+            ncells = List.Count(cells),
+            ncols = if ncells = 0 then 0
                     else 1 + List.Max(List.Transform(cells, each [C])),
-            nrowsAll = if List.IsEmpty(cells) then 0
+            nrowsAll = if ncells = 0 then 0
                        else 1 + List.Max(List.Transform(cells, each [R])),
             nrows = if OptMaxRows = null then nrowsAll else List.Min({nrowsAll, OptMaxRows}),
-            grouped = Table.Sort(
-                Table.Group(Table.FromRecords(cells, type table [R = number, C = number, V = any]),
-                            {"R"}, {{"Cells", each Table.ToRecords(_), type any}}),
-                {"R", Order.Ascending}),
-            MakeRow = (rcs as list) as list =>
-                let filled = List.Accumulate(rcs, {}, (acc, cl) =>
-                        let pad = cl[C] - List.Count(acc)
-                        in  if pad < 0 then acc                       // duplicate cell: keep first
-                            else acc & List.Repeat({null}, pad) & {cl[V]})
-                in  filled & List.Repeat({null}, ncols - List.Count(filled)),
-            rowMap = Record.FromList(
-                List.Transform(Table.ToRecords(grouped), (g) => MakeRow(g[Cells])),
-                List.Transform(Table.ToRecords(grouped), (g) => Number.ToText(g[R]))),
+            // Cells arrive as consecutive runs of equal R (BIFF12 stores rows in
+            // ascending order). Runs are kept as [A, B) index ranges into the one
+            // buffered cell list — never sliced out: like Binary.Range vs a Skip
+            // record, enumerating List.Range(cells, a, _) walks a elements first,
+            // which is quadratic over the sheet. Indexing cells{i} is not.
+            starts = List.Buffer(List.Select({0 .. ncells - 1},
+                         (i) => i = 0 or cells{i}[R] <> cells{i - 1}[R])),
+            nruns = List.Count(starts),
+            runsRaw = List.Buffer(List.Transform({0 .. nruns - 1}, (g) =>
+                [R = cells{starts{g}}[R], A = starts{g},
+                 B = if g + 1 < nruns then starts{g + 1} else ncells])),
+            // real files store rows in order; sort by (R, position) only when a
+            // malformed file has out-of-order or repeated row headers, so those
+            // still assemble with the first cell winning per column
+            unordered = List.Select({0 .. nruns - 2},
+                (g) => runsRaw{g}[R] >= runsRaw{g + 1}[R]),
+            runs = if List.IsEmpty(unordered) then runsRaw
+                   else List.Buffer(List.Sort(runsRaw,
+                        (x, y) => if x[R] <> y[R] then Value.Compare(x[R], y[R])
+                                  else Value.Compare(x[A], y[A]))),
+            // one pointer walk over the columns of src{a}..src{b-1}: cells in a
+            // run are in column order; duplicates keep the first value,
+            // stragglers are dropped
+            MakeRowFrom = (src as list, a as number, b as number) as list =>
+                let SkipLt = (j as number, c as number) as number =>
+                        if j < b and src{j}[C] < c then @SkipLt(j + 1, c) else j
+                in  List.Generate(
+                        () => [c = 0, j = a],
+                        (s) => s[c] < ncols,
+                        (s) => [c = s[c] + 1, j = SkipLt(s[j], s[c] + 1)],
+                        (s) => if s[j] < b and src{s[j]}[C] = s[c] then src{s[j]}[V] else null),
+            RunEnd = (k as number, r as number) as number =>
+                if k < nruns and runs{k}[R] = r then @RunEnd(k + 1, r) else k,
             emptyRow = List.Repeat({null}, ncols),
-            rows = List.Transform({0 .. nrows - 1},
-                       (r) => Record.FieldOrDefault(rowMap, Number.ToText(r), emptyRow)),
+            rows = List.Generate(
+                () => [r = 0, k = 0],
+                (s) => s[r] < nrows,
+                (s) => [r = s[r] + 1, k = RunEnd(s[k], s[r])],
+                (s) => let e = RunEnd(s[k], s[r])
+                       in  if e = s[k] then emptyRow
+                           else if e = s[k] + 1 then MakeRowFrom(cells, runs{s[k]}[A], runs{s[k]}[B])
+                           else // repeated row header (malformed): materialize the
+                                // merged cell list once, then walk it the same way
+                                let merged = List.Buffer(List.Combine(List.Transform({s[k] .. e - 1},
+                                        (g) => List.Transform({runs{g}[A] .. runs{g}[B] - 1}, (i) => cells{i}))))
+                                in  MakeRowFrom(merged, 0, List.Count(merged))),
             colNames = List.Transform({1 .. ncols}, (i) => "Column" & Number.ToText(i)),
             base = if ncols = 0 then #table({}, {})
-                   else Table.FromRows(if nrows = 0 then {} else rows, colNames)
+                   else Table.FromRows(rows, colNames)
         in
             if OptPromote and ncols > 0 then Table.PromoteHeaders(base) else base,
 
