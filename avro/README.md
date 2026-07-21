@@ -59,7 +59,7 @@ Second argument, optional record, all keys optional:
 
 ## Supported
 
-- Codecs: `null` and `deflate`.
+- Codecs: `null`, `deflate`, `snappy`, and `zstandard`.
 - All primitive types: `null`, `boolean`, `int`, `long`, `float`, `double`,
   `bytes`, `string`.
 - Complex types: records (nested), enums, arrays, maps, unions, fixed.
@@ -94,9 +94,12 @@ Second argument, optional record, all keys optional:
 
 ## Limitations
 
-- **Codecs.** `snappy`, `bzip2`, `xz`, and `zstandard` produce a clear error.
-  `Binary.Decompress` currently only offers GZip and Deflate, and `deflate` plus
-  `null` covers essentially all real-world Avro.
+- **Codecs.** `null` and `deflate` decode natively (`Binary.Decompress`); `snappy`
+  and `zstandard` decode through the codec oracle inlined into the reader (a minimal
+  in-memory Parquet file handed to `Parquet.Document`, the same trick as
+  [`codec-oracle`](../codec-oracle)). `bzip2` and `xz` produce a clear error — the
+  engine has no codec for them. Codec availability lives in the host's
+  `Parquet.Document`; snappy/zstandard are confirmed in Power BI Desktop.
 - **Precision.** M numbers are doubles: `long` values beyond 2^53 lose precision,
   as do decimals whose unscaled value exceeds 2^53.
 - **Writer schema only.** The schema embedded in the file is used as-is; schema
@@ -105,8 +108,9 @@ Second argument, optional record, all keys optional:
   blobs, e.g. a Kafka message body) are not container files and are not supported.
 - **Memory.** The whole file is buffered; peak memory is a multiple of file size.
   Fine for capture-sized files, not for multi-GB archives.
-- **No CRC.** Nothing in M can hash, so the optional CRC in snappy blocks (already
-  out of scope) and any integrity checking are skipped.
+- **CRC.** The snappy codec appends a CRC-32 of the uncompressed block data. Those
+  4 bytes are stripped before decoding (they are not part of the snappy stream) but
+  the checksum is not validated — the per-block sync marker already catches corruption.
 
 ## How it works
 

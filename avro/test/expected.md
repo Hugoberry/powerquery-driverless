@@ -41,6 +41,20 @@ Byte-for-byte the same rows as `scalars.avro`, compressed with the `deflate` cod
 (raw RFC 1951, no zlib header — must decompress with `Compression.Deflate`).
 Proves the codec path; output must equal `scalars.avro` exactly.
 
+## scalars-snappy.avro — 4 rows, codec snappy
+
+The same rows as `scalars.avro`, compressed with the `snappy` codec. Each Avro
+snappy block is a raw snappy stream followed by a 4-byte big-endian CRC-32 of the
+uncompressed block data. Proves the inlined codec oracle: the reader strips the
+CRC trailer, wraps the snappy bytes in a one-cell Parquet file and lets
+`Parquet.Document` decompress it. Output must equal `scalars.avro` exactly.
+
+## scalars-zstandard.avro — 4 rows, codec zstandard
+
+The same rows as `scalars.avro`, compressed with the `zstandard` codec — a plain
+zstd frame per block, whose Frame_Content_Size the oracle reads to size the wrapper.
+Proves the zstandard oracle path; output must equal `scalars.avro` exactly.
+
 ## empty.avro — 0 rows
 
 The `Scalars` schema with no data blocks at all (header + sync marker only).
