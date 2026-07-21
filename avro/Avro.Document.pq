@@ -26,14 +26,18 @@
 //                    tolerated becomes an error (non-JSON Body with ParseBodyAsJson,
 //                    trailing bytes inside a data block).
 //
-// Supported: codecs null and deflate; all primitive types; records, enums, arrays,
-//            maps, unions, fixed; named type references incl. recursive schemas;
-//            logical types decimal, date, time-millis/micros, timestamp-millis/micros,
-//            local-timestamp-millis/micros, uuid, duration; multi-block files;
-//            Event Hubs Capture Body unwrapping.
-// Not supported: codecs snappy/bzip2/xz/zstandard (clear error); schema resolution
-//            against a reader schema (the writer schema embedded in the file is used);
-//            single-object encoding and raw datum streams (this reads OCF only).
+// Supported: codecs null, deflate, snappy, zstandard; all primitive types; records,
+//            enums, arrays, maps, unions, fixed; named type references incl. recursive
+//            schemas; logical types decimal, date, time-millis/micros,
+//            timestamp-millis/micros, local-timestamp-millis/micros, uuid, duration;
+//            multi-block files; Event Hubs Capture Body unwrapping.
+//            snappy and zstandard blocks are decompressed through the codec oracle
+//            inlined below (a minimal in-memory Parquet file handed to Parquet.Document,
+//            since Binary.Decompress exposes only deflate/gzip). A snappy block's
+//            4-byte CRC-32 trailer is stripped before decoding, not validated.
+// Not supported: codecs bzip2 and xz (clear error — the engine has no codec for them);
+//            schema resolution against a reader schema (the writer schema embedded in
+//            the file is used); single-object encoding and raw datum streams (OCF only).
 // Precision: Avro longs beyond 2^53 lose precision (M numbers are doubles); the same
 //            applies to decimals whose unscaled value exceeds 2^53.
 // Output:    a table (one column per field of the top-level record, or a single
@@ -135,11 +139,175 @@ let
 
     Codec = let c = MetaLookup("avro.codec")
             in  if c = null then "null" else Text.FromBinary(c, TextEncoding.Utf8),
+
+    //==================== codec oracle (snappy / zstandard) ====================
+    // Binary.Decompress implements only deflate and gzip, but the engine's Parquet
+    // reader ships snappy, zstandard and more. CodecDecompress wraps a raw codec
+    // stream in a minimal, spec-conformant Parquet file (one REQUIRED
+    // FIXED_LEN_BYTE_ARRAY column, one row, PLAIN encoding, so the uncompressed
+    // data page is exactly the payload) and lets Parquet.Document decompress it.
+    // The repo's codec-oracle/Codec.Decompress.pq is the full, general version
+    // (all seven Compression.Type members, size overrides, LZ4 framing options);
+    // Avro uses only snappy and zstandard, so just those two — and the size
+    // derivation each needs — are inlined here. See codec-oracle/README.md.
+    CodecDecompress = (compressed as binary, compression as number) as binary =>
+    let
+        // parquet CompressionCodec enum: SNAPPY = 1, ZSTD = 6
+        codecId = if compression = Compression.Snappy then 1 else 6,
+        blobLen = Binary.Length(compressed),
+
+        UVarint = (n as number) as list =>
+            List.Generate(
+                () => [v = n, emit = true],
+                each [emit],
+                each [v = Number.IntegerDivide([v], 128), emit = [v] >= 128],
+                each if [v] < 128 then [v] else Number.Mod([v], 128) + 128
+            ),
+        Z = (n as number) as binary =>
+            Binary.FromList(UVarint(if n >= 0 then 2 * n else -2 * n - 1)),
+        UInt32LE = (n as number) as binary =>
+            Binary.FromList({
+                Number.Mod(n, 256),
+                Number.Mod(Number.IntegerDivide(n, 256), 256),
+                Number.Mod(Number.IntegerDivide(n, 65536), 256),
+                Number.Mod(Number.IntegerDivide(n, 16777216), 256)
+            }),
+
+        // the wrapper must declare the decompressed size; each codec stores it:
+        // snappy as a leading varint preamble, a zstd frame as Frame_Content_Size
+        // in its header (always written by the one-shot compressors Avro uses).
+        SnappyPreambleSize =
+            let
+                head = Binary.ToList(Binary.Range(compressed, 0, List.Min({5, blobLen}))),
+                folded = List.Accumulate(head, [value = 0, shift = 0, done = false],
+                    (s, b) =>
+                        if s[done] then s
+                        else [
+                            value = s[value] + Number.BitwiseShiftLeft(Number.BitwiseAnd(b, 127), s[shift]),
+                            shift = s[shift] + 7,
+                            done = b < 128
+                        ])
+            in
+                if folded[done] then folded[value]
+                else error Error.Record("DataFormat.Error", "Not a raw snappy stream: unterminated preamble varint"),
+        ZstdContentSize =
+            let
+                head = List.FirstN(
+                    Binary.ToList(Binary.Range(compressed, 0, List.Min({18, blobLen}))) & List.Repeat({0}, 18), 18),
+                magicOk = head{0} = 0x28 and head{1} = 0xB5 and head{2} = 0x2F and head{3} = 0xFD,
+                fhd = head{4},
+                fcsFlag = Number.BitwiseShiftRight(fhd, 6),
+                singleSegment = Number.BitwiseAnd(Number.BitwiseShiftRight(fhd, 5), 1),
+                didLen = {0, 1, 2, 4}{Number.BitwiseAnd(fhd, 3)},
+                pos = 5 + (if singleSegment = 1 then 0 else 1) + didLen
+            in
+                if not magicOk then
+                    error Error.Record("DataFormat.Error", "Not a zstd frame (bad magic)")
+                else if fcsFlag = 0 then
+                    (if singleSegment = 1 then head{pos}
+                     else error Error.Record("DataFormat.Error",
+                        "This zstd frame does not declare its content size"))
+                else if fcsFlag = 1 then head{pos} + head{pos + 1} * 256 + 256
+                else if fcsFlag = 2 then
+                    head{pos} + head{pos + 1} * 256 + head{pos + 2} * 65536 + head{pos + 3} * 16777216
+                else
+                    List.Accumulate({0, 1, 2, 3, 4, 5, 6, 7}, 0,
+                        (s, i) => s + head{pos + i} * Number.Power(256, i)),
+        usize =
+            if compression = Compression.Snappy then SnappyPreambleSize else ZstdContentSize,
+
+        PageHeader = Binary.Combine({
+            #binary({0x15}), Z(0),
+            #binary({0x15}), Z(usize),
+            #binary({0x15}), Z(blobLen),
+            #binary({0x2C}),
+                #binary({0x15}), Z(1),
+                #binary({0x15}), Z(0),
+                #binary({0x15}), Z(3),
+                #binary({0x15}), Z(3),
+                #binary({0x00}),
+            #binary({0x00})
+        }),
+        phLen = Binary.Length(PageHeader),
+
+        SchemaRoot = Binary.Combine({
+            #binary({0x48, 0x06}), Text.ToBinary("schema"),
+            #binary({0x15}), Z(1),
+            #binary({0x00})
+        }),
+        SchemaCol = Binary.Combine({
+            #binary({0x15}), Z(7),
+            #binary({0x15}), Z(usize),
+            #binary({0x15}), Z(0),
+            #binary({0x18, 0x07}), Text.ToBinary("payload"),
+            #binary({0x00})
+        }),
+        ColumnMetaData = Binary.Combine({
+            #binary({0x15}), Z(7),
+            #binary({0x19, 0x25}), Z(0), Z(3),
+            #binary({0x19, 0x18, 0x07}), Text.ToBinary("payload"),
+            #binary({0x15}), Z(codecId),
+            #binary({0x16}), Z(1),
+            #binary({0x16}), Z(phLen + usize),
+            #binary({0x16}), Z(phLen + blobLen),
+            #binary({0x26}), Z(4),
+            #binary({0x00})
+        }),
+        ColumnChunk = Binary.Combine({
+            #binary({0x26}), Z(4),
+            #binary({0x1C}), ColumnMetaData,
+            #binary({0x00})
+        }),
+        RowGroup = Binary.Combine({
+            #binary({0x19, 0x1C}), ColumnChunk,
+            #binary({0x16}), Z(phLen + blobLen),
+            #binary({0x16}), Z(1),
+            #binary({0x00})
+        }),
+        createdBy = Text.ToBinary("powerquery-driverless codec oracle"),
+        FileMetaData = Binary.Combine({
+            #binary({0x15}), Z(1),
+            #binary({0x19, 0x2C}), SchemaRoot, SchemaCol,
+            #binary({0x16}), Z(1),
+            #binary({0x19, 0x1C}), RowGroup,
+            #binary({0x28}), Binary.FromList(UVarint(Binary.Length(createdBy))), createdBy,
+            #binary({0x00})
+        }),
+
+        Wrapper = Binary.Combine({
+            Text.ToBinary("PAR1"),
+            PageHeader,
+            compressed,
+            FileMetaData,
+            UInt32LE(Binary.Length(FileMetaData)),
+            Text.ToBinary("PAR1")
+        }),
+
+        // Parquet.Document needs a random-access binary; Binary.Combine over a
+        // streamed input yields a streamed one, hence the Binary.Buffer.
+        result = Parquet.Document(Binary.Buffer(Wrapper)){0}[payload]
+    in
+        result,
+
+    // Avro codec dispatch. null/deflate are native (Binary.Decompress); snappy and
+    // zstandard route through the oracle above. An Avro snappy block is a raw snappy
+    // stream followed by a 4-byte big-endian CRC-32 of the uncompressed data; those
+    // trailing bytes are not part of the snappy stream, so they are dropped before
+    // decoding. The CRC itself is not validated — the per-block sync marker already
+    // catches corruption.
     Inflate =
         if Codec = "null" then (b as binary) as binary => b
         else if Codec = "deflate" then (b as binary) as binary => Binary.Decompress(b, Compression.Deflate)
+        else if Codec = "snappy" then (b as binary) as binary =>
+            let n = Binary.Length(b)
+            in  if n < 4 then
+                    error Error.Record("DataFormat.Error",
+                        "Corrupt Avro snappy block: shorter than its 4-byte CRC-32 trailer.", [BlockBytes = n])
+                else CodecDecompress(Binary.Range(b, 0, n - 4), Compression.Snappy)
+        else if Codec = "zstandard" then (b as binary) as binary => CodecDecompress(b, Compression.Zstandard)
         else error Error.Record("DataFormat.Error",
-                 "Unsupported Avro codec """ & Codec & """. Supported codecs: null, deflate.",
+                 "Unsupported Avro codec """ & Codec & """. Supported codecs: null, deflate, snappy, zstandard "
+                     & "(bzip2 and xz have no engine codec and are not supported).",
                  [Codec = Codec]),
 
     //==================== schema: named types ====================
