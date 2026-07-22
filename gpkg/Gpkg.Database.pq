@@ -41,7 +41,9 @@
 //            EWKB — null by default, clear error under Strict; features
 //            registered as SQL views (clear error per entry); rtree
 //            spatial-index internals are deliberately hidden.
-// Precision: integers beyond 2^53 lose precision (M numbers are doubles).
+// Precision: integer cells decode exactly across the full signed 64-bit range
+//            (inherited from Sqlite3.Database); downstream M arithmetic may still
+//            coerce to double past 2^53.
 // Output:    a navigation table (Name, DataType, Data, ItemKind, ItemName,
 //            IsLeaf), one row per gpkg_contents entry, with
 //            Gpkg.ApplicationId and Gpkg.UserVersion in the table metadata.

@@ -81,7 +81,9 @@ metadata; each feature table carries `Gpkg.SrsId`, `Gpkg.DataType` and
 - **Memory.** The whole file is buffered; peak memory is a multiple of file
   size. Fine for the megabyte-to-hundreds-of-megabytes files GeoPackage is
   typically used for.
-- **Precision.** Integers beyond 2^53 lose precision (M numbers are doubles).
+- **Precision.** Integer cells decode exactly across the full signed 64-bit
+  range (inherited from `Sqlite3.Database`). M numbers are IEEE doubles, so
+  arithmetic on values beyond 2^53 afterwards can still coerce to double.
 
 ### Why two queries
 

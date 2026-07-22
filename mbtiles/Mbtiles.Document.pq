@@ -36,7 +36,9 @@
 //            SQLite-level support and limits are those of Sqlite3.Database.
 // Not supported: `tiles` views other than the map + images layout (clear
 //            error).
-// Precision: integers beyond 2^53 lose precision (M numbers are doubles).
+// Precision: integer cells decode exactly across the full signed 64-bit range
+//            (inherited from Sqlite3.Database); downstream M arithmetic may still
+//            coerce to double past 2^53.
 // Output:    a navigation table (Name, Data, ItemKind, ItemName, IsLeaf) with
 //            Metadata and Tiles entries (plus grids tables when present).
 //            Tiles carries zoom_level / tile_column / tile_row exactly as

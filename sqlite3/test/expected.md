@@ -50,7 +50,7 @@ from the rowid; the last rowid is 2^40, proving multi-byte varint rowids.
 | 6 | 8388607 | 3.141592653589793 | 🚀 rocket | null | null | 0 |
 | 7 | -2147483648 | 2 | null | 7F 80 | null | 1 |
 | 8 | 140737488355327 | 0 | ascii | 0 bytes | null | -1 |
-| 1099511627776 | 9007199254740992 (see note) | 0.5 | big rowid | FE | null | -9223372036854775808 (see note) |
+| 1099511627776 | 9007199254740993 | 0.5 | big rowid | FE | null | 9223372036854775807 |
 
 Notes:
 
@@ -58,13 +58,13 @@ Notes:
   optimization stores them as integers on disk (serial types 8 and 1), and the
   sign of `-0.0` is lost by SQLite itself before the reader is involved. They
   must read back as the numbers 0, 2, 0.
-- Row 9 `iv` was written as 9007199254740993 (2^53 + 1). M numbers are doubles,
-  so it reads as 9007199254740992: the documented precision limitation.
-- Row 9 `av` was written as 9223372036854775807 (max int64). The reader's
-  double arithmetic rounds the unsigned accumulation up to exactly 2^63, which
-  then trips the two's complement branch, so the value reads back
-  **negative**: -9223372036854775808. This is the sharpest edge of the 2^53
-  limitation; the fixture pins the behaviour so a change is noticed.
+- Row 9 `iv` was written as 9007199254740993 (2^53 + 1) and `av` as
+  9223372036854775807 (max int64). Both read back **exactly**: 8-byte integer
+  cells decode through `BinaryFormat.SignedInteger64`, which preserves the full
+  signed 64-bit range. (The earlier accumulate-to-double path rounded `iv` down
+  to 9007199254740992 and rounded `av` up to 2^63 — tripping the two's-complement
+  branch and flipping it to -9223372036854775808; the fixture pins the corrected
+  values so a regression is noticed.)
 - 140737488355327 is 2^47 - 1, the largest 6-byte value: exact, no loss.
 
 `Empty(id INTEGER PRIMARY KEY, note TEXT)` has no rows. It must materialize as
