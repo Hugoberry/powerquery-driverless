@@ -8,7 +8,7 @@
 # harness and read the identical file.
 #
 # For each pairing the same full-decode workload runs twice: once with the
-# repo's pure-M reader (fixture embedded in PQDriverless.mez), once with a
+# repo's pure-M reader (fixture embedded in PQDriverless.tests.mez), once with a
 # Python/R script (context/SCRIPT-PERF-SPEC.md, Route A) reading the file from
 # disk and printing one integer. Both must agree on a parity value or the
 # pairing aborts:
@@ -43,7 +43,7 @@ param(
     [int]$Runs        = 5,
     [string]$Label    = "",
     [string]$PqTest,
-    [string]$Mez      = (Join-Path (Split-Path $PSScriptRoot -Parent) "out/PQDriverless.mez"),
+    [string]$Mez      = (Join-Path (Split-Path $PSScriptRoot -Parent) "out/PQDriverless.tests.mez"),
     [string]$ToolsDir = (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) ".pqtools"),
     [string]$OutDir   = (Join-Path $PSScriptRoot "results"),
     # haven lives in the user library; the R provider's Rscript must see it.

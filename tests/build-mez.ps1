@@ -1,11 +1,20 @@
-# Assembles PQDriverless.mez: one section document exposing every reader as a
-# shared member, plus every test fixture embedded as a resource so test queries
-# can load them with Extension.Contents and stay path-free.
+# Assembles the PQDriverless section document into two .mez packages:
 #
-# A .mez is a zip. Layout produced:
+#   PQDriverless.mez        slim - the section document only. This is the
+#                           distributable connector (load it in Power BI).
+#   PQDriverless.tests.mez  section document + every test fixture embedded as a
+#                           resource, so test queries can load them with
+#                           Extension.Contents and stay path-free. Consumed by
+#                           run-tests.ps1 and the perf harnesses; not shipped.
+#
+# The section document (the actual reader code) is identical in both; only the
+# tests mez carries fixtures.
+#
+# A .mez is a zip. Layout of the tests package:
 #   PQDriverless.pq          section document (generated below)
 #   <reader>.<fixture>       e.g. sqlite3.types.db, dbf.vfp.fpt
 #   perf.<fixture>           CI-generated large fixtures, if present
+# The slim package contains PQDriverless.pq alone.
 #
 # Usage: pwsh tests/build-mez.ps1 [-RepoRoot <path>] [-OutDir <path>]
 
@@ -25,9 +34,7 @@ $Readers = @(
 
 $Renames = @{ "Access.Database" = "AccessReader.Database" }
 
-$Stage = Join-Path $OutDir "stage"
-if (Test-Path $Stage) { Remove-Item $Stage -Recurse -Force }
-New-Item $Stage -ItemType Directory -Force | Out-Null
+New-Item $OutDir -ItemType Directory -Force | Out-Null
 
 # ---- section document ----
 # The Fixture accessor is the module's (anonymous) data source function: test
@@ -60,17 +67,27 @@ foreach ($dir in $Readers) {
         [void]$sb.AppendLine("")
     }
 }
+$SectionDoc = $sb.ToString()
 
-Set-Content (Join-Path $Stage "PQDriverless.pq") $sb.ToString() -Encoding UTF8
+# ---- stage both packages ----
+$StageRoot = Join-Path $OutDir "stage"
+if (Test-Path $StageRoot) { Remove-Item $StageRoot -Recurse -Force }
+$SlimStage = Join-Path $StageRoot "slim"
+$FullStage = Join-Path $StageRoot "full"
+New-Item $SlimStage -ItemType Directory -Force | Out-Null
+New-Item $FullStage -ItemType Directory -Force | Out-Null
 
-# ---- fixtures ----
+Set-Content (Join-Path $SlimStage "PQDriverless.pq") $SectionDoc -Encoding UTF8
+Set-Content (Join-Path $FullStage "PQDriverless.pq") $SectionDoc -Encoding UTF8
+
+# ---- fixtures (tests package only) ----
 $SkipExt = @(".py", ".md", ".java", ".pyc")
 foreach ($dir in $Readers) {
     $testDir = Join-Path (Join-Path $RepoRoot $dir) "test"
     if (-not (Test-Path $testDir)) { continue }
     foreach ($f in Get-ChildItem $testDir -File) {
         if ($SkipExt -contains $f.Extension.ToLower()) { continue }
-        Copy-Item $f.FullName (Join-Path $Stage "$dir.$($f.Name)")
+        Copy-Item $f.FullName (Join-Path $FullStage "$dir.$($f.Name)")
     }
 }
 
@@ -78,17 +95,24 @@ foreach ($dir in $Readers) {
 $PerfOut = Join-Path $PSScriptRoot "perf/out"
 if (Test-Path $PerfOut) {
     foreach ($f in Get-ChildItem $PerfOut -File) {
-        Copy-Item $f.FullName (Join-Path $Stage "perf.$($f.Name)")
+        Copy-Item $f.FullName (Join-Path $FullStage "perf.$($f.Name)")
     }
 }
 
 # ---- package ----
-$MezPath = Join-Path $OutDir "PQDriverless.mez"
-if (Test-Path $MezPath) { Remove-Item $MezPath -Force }
-$ZipPath = "$MezPath.zip"
-if (Test-Path $ZipPath) { Remove-Item $ZipPath -Force }
-Compress-Archive -Path (Join-Path $Stage "*") -DestinationPath $ZipPath
-Move-Item $ZipPath $MezPath
+function New-Mez {
+    param([string]$StageDir, [string]$MezPath)
 
-$count = (Get-ChildItem $Stage -File).Count
-Write-Host "Built $MezPath ($count files, $([math]::Round((Get-Item $MezPath).Length / 1MB, 1)) MB)"
+    if (Test-Path $MezPath) { Remove-Item $MezPath -Force }
+    $ZipPath = "$MezPath.zip"
+    if (Test-Path $ZipPath) { Remove-Item $ZipPath -Force }
+    Compress-Archive -Path (Join-Path $StageDir "*") -DestinationPath $ZipPath
+    Move-Item $ZipPath $MezPath
+
+    $count = (Get-ChildItem $StageDir -File).Count
+    Write-Host ("Built {0} ({1} files, {2} MB)" -f `
+        $MezPath, $count, [math]::Round((Get-Item $MezPath).Length / 1MB, 1))
+}
+
+New-Mez $SlimStage (Join-Path $OutDir "PQDriverless.mez")
+New-Mez $FullStage (Join-Path $OutDir "PQDriverless.tests.mez")

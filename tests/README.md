@@ -7,17 +7,20 @@ on pull requests and manual dispatch) or locally on any Windows machine.
 
 ## How it fits together
 
-1. `build-mez.ps1` assembles **PQDriverless.mez**: a generated section document
-   that exposes every reader `.pq` as a shared member (`Sqlite3.Database`,
-   `Dbf.Table`, ...), plus every fixture from each reader's `test/` folder
-   embedded as a resource named `<reader>.<file>`. `Extension.Contents` only
-   exists inside the module, so the section also defines an anonymous data
-   source function `PQDriverless.Fixture(optional name)` that serves the
-   embedded fixtures to test queries (`PQDriverless.Fixture("dbf.vfp.dbf")`);
-   the parameter is optional so the data source path stays constant and one
-   anonymous credential covers everything. Because gpkg/mbtiles call
-   `Sqlite3.Database` as a sibling query, the section document satisfies that
-   reference naturally.
+1. `build-mez.ps1` assembles a generated section document that exposes every
+   reader `.pq` as a shared member (`Sqlite3.Database`, `Dbf.Table`, ...) and
+   packages it into two `.mez` files. **PQDriverless.mez** is slim - the
+   section document alone; it is the distributable connector to load in Power
+   BI. **PQDriverless.tests.mez** carries the same section document plus every
+   fixture from each reader's `test/` folder embedded as a resource named
+   `<reader>.<file>`, and is what the test and perf harnesses run against.
+   `Extension.Contents` only exists inside the module, so the section also
+   defines an anonymous data source function `PQDriverless.Fixture(optional
+   name)` that serves the embedded fixtures to test queries
+   (`PQDriverless.Fixture("dbf.vfp.dbf")`); the parameter is optional so the
+   data source path stays constant and one anonymous credential covers
+   everything. Because gpkg/mbtiles call `Sqlite3.Database` as a sibling query,
+   the section document satisfies that reference naturally.
 2. `queries/<reader>/<name>.query.pq` are the tests. Each is a single M
    expression. Navigation-table readers are dumped via `Table.ToRecords` per
    entry (full-content check) or `Table.RowCount` (stress fixtures); direct

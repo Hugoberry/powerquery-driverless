@@ -2,7 +2,7 @@
 #
 # For each pairing below, the same full-decode query (every cell folded into a
 # non-null count) runs through PQTest.exe twice: once with the repo's
-# driverless reader (fixture embedded in PQDriverless.mez), once with
+# driverless reader (fixture embedded in PQDriverless.tests.mez), once with
 # Odbc.Query through the installed driver reading the identical file from
 # disk. Both sides must return the same value or the pairing fails. Pairings
 # whose driver or fixture is missing on this machine are recorded as skipped,
@@ -30,7 +30,7 @@ param(
     # <hostname>-<label>.json+md instead of <hostname>.json+md.
     [string]$Label    = "",
     [string]$PqTest,
-    [string]$Mez      = (Join-Path (Split-Path $PSScriptRoot -Parent) "out/PQDriverless.mez"),
+    [string]$Mez      = (Join-Path (Split-Path $PSScriptRoot -Parent) "out/PQDriverless.tests.mez"),
     [string]$ToolsDir = (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) ".pqtools"),
     [string]$OutDir   = (Join-Path $PSScriptRoot "results")
 )

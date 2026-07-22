@@ -18,7 +18,7 @@
 
 param(
     [string]$PqTest,
-    [string]$Mez       = (Join-Path $PSScriptRoot "out/PQDriverless.mez"),
+    [string]$Mez       = (Join-Path $PSScriptRoot "out/PQDriverless.tests.mez"),
     [string]$ToolsDir  = (Join-Path (Split-Path $PSScriptRoot -Parent) ".pqtools"),
     [string]$ReportDir = (Join-Path $PSScriptRoot "out")
 )
