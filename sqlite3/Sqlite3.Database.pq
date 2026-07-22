@@ -25,7 +25,9 @@
 //            ALTER TABLE ADD COLUMN short records, multi-level b-trees.
 // Not supported: WITHOUT ROWID tables (index b-tree layout), virtual tables,
 //            reading un-checkpointed data from a -wal file (see notes at end).
-// Precision: integers beyond 2^53 lose precision (M numbers are doubles).
+// Precision: integers decode exactly across the full signed 64-bit range
+//            (8-byte serial types via BinaryFormat.SignedInteger64); downstream M
+//            arithmetic on them may still coerce to double past 2^53.
 
 (source as binary, optional options as nullable record) as table =>
 let
@@ -41,17 +43,24 @@ let
 
     UInt16BEFormat = BinaryFormat.ByteOrder(BinaryFormat.UnsignedInteger16, ByteOrder.BigEndian),
     UInt32BEFormat = BinaryFormat.ByteOrder(BinaryFormat.UnsignedInteger32, ByteOrder.BigEndian),
-    
+
+    // Signed big-endian formats hoisted once; dispatched per cell for serial types
+    // 2/4/6. Unlike the old accumulate-to-double path these decode the full 64-bit
+    // range exactly (8-byte integers above 2^53 no longer round). Widths BinaryFormat
+    // cannot express (3- and 6-byte, serial types 3/5) keep the accumulate helper
+    // with precomputed sign constants.
+    Int16BEFormat = BinaryFormat.ByteOrder(BinaryFormat.SignedInteger16, ByteOrder.BigEndian),
+    Int32BEFormat = BinaryFormat.ByteOrder(BinaryFormat.SignedInteger32, ByteOrder.BigEndian),
+    Int64BEFormat = BinaryFormat.ByteOrder(BinaryFormat.SignedInteger64, ByteOrder.BigEndian),
+
     Float64BEFormat = BinaryFormat.ByteOrder(BinaryFormat.Double, ByteOrder.BigEndian),
     ReadByte = (b as binary, offset as number) as number => BinaryFormat.Byte(Binary.Range(b, offset, 1)),
     UIntBE = (b as binary) as number => List.Accumulate(Binary.ToList(b), 0, (s, c) => s * 256 + c),
-    IntBE = (b as binary) as number =>
-        let
-            n = Binary.Length(b),
-            u = UIntBE(b)
-        in
-            if u >= Number.Power(2, 8 * n - 1) then u - Number.Power(2, 8 * n)
-            else u,
+    // signed decode of the two odd widths only (3 bytes = 2^23/2^24, 6 bytes = 2^47/2^48)
+    Int3BE = (b as binary) as number =>
+        let u = UIntBE(b) in if u >= 8388608 then u - 16777216 else u,
+    Int6BE = (b as binary) as number =>
+        let u = UIntBE(b) in if u >= 140737488355328 then u - 281474976710656 else u,
     
     Byte = (off as number) as number => ReadByte(bin, off),
     UInt2 = (off as number) as number => UInt16BEFormat(Binary.Range(bin, off, 2)),
@@ -153,7 +162,12 @@ let
         else if st = 8 then 0
         else if st = 9 then 1
         else if st = 7 then Float64BE(Slice(payload, off, 8))
-        else if st <= 6 then IntBE(Slice(payload, off, SerialSize(st)))
+        else if st = 1 then let u = ReadByte(payload, off) in if u >= 128 then u - 256 else u
+        else if st = 2 then Int16BEFormat(Slice(payload, off, 2))
+        else if st = 4 then Int32BEFormat(Slice(payload, off, 4))
+        else if st = 6 then Int64BEFormat(Slice(payload, off, 8))
+        else if st = 3 then Int3BE(Slice(payload, off, 3))
+        else if st = 5 then Int6BE(Slice(payload, off, 6))
         else if Number.Mod(st, 2) = 0 then Slice(payload, off, SerialSize(st))       // blob
         else Text.FromBinary(Slice(payload, off, SerialSize(st)), Enc),              // text
 

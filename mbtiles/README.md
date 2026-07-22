@@ -73,8 +73,9 @@ out for convenience.
   error naming the reason.
 - **Memory.** The whole file is buffered; peak memory is a multiple of file
   size. City- and region-scale tilesets are fine; a planet extract is not.
-- **Precision.** Integers beyond 2^53 lose precision (M numbers are
-  doubles).
+- **Precision.** Integer cells decode exactly across the full signed 64-bit
+  range (inherited from `Sqlite3.Database`). M numbers are IEEE doubles, so
+  arithmetic on values beyond 2^53 afterwards can still coerce to double.
 
 ### Why two queries
 

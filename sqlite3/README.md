@@ -81,7 +81,7 @@ Second argument, optional record, all keys optional:
 | **No SQL** | You get whole-table scans; filtering and joining happen in M afterwards. There is no predicate pushdown. |
 | **`WITHOUT ROWID` tables** | Stored as index b-trees; not implemented (such tables surface an error in their `Data` cell). |
 | **Virtual tables** | No b-tree storage; surfaced as an error in their `Data` cell. |
-| **Integer precision** | M numbers are IEEE doubles; integers beyond 2^53 lose precision. |
+| **Integer precision** | Integer cells decode exactly across the full signed 64-bit range (8-byte values via `BinaryFormat.SignedInteger64`). M numbers are IEEE doubles, so arithmetic you do on values beyond 2^53 afterwards can still coerce to double. |
 | **Performance** | Fine for small-to-medium databases. Whole-file buffering plus full scans means very large files will be slow; consider exporting hot tables to Parquet/CSV instead at that scale. |
 
 ## Reading a live, frequently-written database
