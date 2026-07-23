@@ -1,0 +1,150 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 908" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" role="img" aria-labelledby="ttl desc">
+  <title id="ttl">The Codec Oracle</title>
+  <desc id="desc">How Codec.Decompress decompresses Snappy, Brotli, Zstd and LZ4 in pure Power Query M by wrapping the compressed stream in a one-cell Parquet file and letting Parquet.Document decode it.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-end">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6472"/>
+    </marker>
+    <marker id="arrowI" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-end">
+      <path d="M0 0 L10 5 L0 10 z" fill="#4f46e5"/>
+    </marker>
+    <style>
+      .h1  { font-size: 34px; font-weight: 700; fill: #14161f; }
+      .sub { font-size: 15.5px; fill: #5b6472; }
+      .badge { font-size: 15px; font-weight: 700; fill: #ffffff; }
+      .band { font-size: 17px; font-weight: 700; fill: #14161f; }
+      .cap  { font-size: 11px; font-weight: 700; letter-spacing: 1.3px; fill: #8a94a6; }
+      .body { font-size: 13.5px; fill: #3a4150; }
+      .bodym{ font-size: 13.5px; fill: #5b6472; }
+      .mono { font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace; }
+      .code { font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace; font-size: 14px; fill: #14161f; }
+      .tag  { font-size: 12.5px; font-weight: 700; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1280" height="908" fill="#fbfbfd"/>
+
+  <!-- ============ HEADER ============ -->
+  <text x="56" y="52" class="h1">The Codec Oracle</text>
+  <text x="56" y="80" class="sub">Snappy · Brotli · Zstandard · LZ4 decompression in pure M — by borrowing the codecs already inside <tspan class="mono" font-weight="600" fill="#4f46e5">Parquet.Document</tspan></text>
+  <line x1="56" y1="100" x2="1224" y2="100" stroke="#e6e8ef" stroke-width="1"/>
+
+  <!-- ============ BAND 1 — THE WALL ============ -->
+  <circle cx="66" cy="130" r="12" fill="#14161f"/>
+  <text x="66" y="135" text-anchor="middle" class="badge">1</text>
+  <text x="88" y="135" class="band">M's built-in decompressor stops at two codecs</text>
+
+  <!-- call box -->
+  <rect x="56" y="152" width="356" height="104" rx="10" fill="#ffffff" stroke="#d9dde6" stroke-width="1.5"/>
+  <text x="76" y="180" class="cap">STANDARD LIBRARY</text>
+  <text x="76" y="209" class="code">Binary.Decompress(</text>
+  <text x="76" y="230" class="code">    blob, Compression.X)</text>
+
+  <!-- lane: handled -->
+  <rect x="444" y="152" width="780" height="46" rx="9" fill="#e9f6ef" stroke="#bfe6d1" stroke-width="1.3"/>
+  <text x="466" y="180" class="tag" fill="#0f7a4f">✓  GZip · Deflate</text>
+  <text x="642" y="180" class="body" fill="#2f6b4f">handled natively — routed straight to Binary.Decompress</text>
+
+  <!-- lane: refused -->
+  <rect x="444" y="208" width="780" height="48" rx="9" fill="#fdecec" stroke="#f4c6c6" stroke-width="1.3"/>
+  <text x="466" y="237" class="tag" fill="#c02626">✗  Snappy · Brotli · Zstandard · LZ4</text>
+  <text x="742" y="237" class="body" fill="#a13a3a">declared on the enum, but refused at runtime</text>
+
+  <!-- connector call -> lanes -->
+  <line x1="412" y1="204" x2="440" y2="204" stroke="#5b6472" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ============ BAND 2 — THE FORGE ============ -->
+  <circle cx="66" cy="304" r="12" fill="#4f46e5"/>
+  <text x="66" y="309" text-anchor="middle" class="badge">2</text>
+  <text x="88" y="309" class="band">The engine owns those codecs anyway — every Parquet read uses them</text>
+  <text x="88" y="331" class="bodym">So forge a tiny, spec-valid Parquet file whose single cell <tspan font-weight="700" fill="#3a4150">is</tspan> your compressed stream, then let <tspan class="mono" fill="#4f46e5">Parquet.Document</tspan> decompress it.</text>
+
+  <!-- forged file byte stack (left)  -->
+  <text x="56" y="372" class="cap">THE FORGED FILE — <tspan class="mono" letter-spacing="0">Binary.Combine</tspan>, NO RE-ENCODING</text>
+
+  <!-- row: PAR1 -->
+  <rect x="56" y="384" width="452" height="30" rx="6" fill="#eef0fe" stroke="#c9cdf7" stroke-width="1.2"/>
+  <text x="72" y="404" class="code" fill="#4338ca">PAR1</text>
+  <text x="330" y="404" class="bodym" text-anchor="start" font-size="12">magic number</text>
+
+  <!-- row: page header -->
+  <rect x="56" y="418" width="452" height="60" rx="6" fill="#eef0fe" stroke="#c9cdf7" stroke-width="1.2"/>
+  <text x="72" y="440" class="code" fill="#4338ca">PageHeader</text>
+  <text x="72" y="461" class="mono" font-size="11.5" fill="#6b6fc4">uncompressed_page_size = <tspan fill="#0d9488" font-weight="700">usize</tspan> · PLAIN</text>
+
+  <!-- row: payload (hero) -->
+  <rect x="56" y="482" width="452" height="72" rx="6" fill="#fef3e2" stroke="#f2c98a" stroke-width="1.6"/>
+  <text x="72" y="512" class="code" fill="#b45309" font-size="15" font-weight="700">‹ your compressed stream ›</text>
+  <text x="72" y="536" class="mono" font-size="11.5" fill="#a56a1e">the data page — dropped in byte-for-byte</text>
+
+  <!-- row: file metadata -->
+  <rect x="56" y="558" width="452" height="72" rx="6" fill="#eef0fe" stroke="#c9cdf7" stroke-width="1.2"/>
+  <text x="72" y="580" class="code" fill="#4338ca">FileMetaData</text>
+  <text x="72" y="600" class="mono" font-size="11.5" fill="#6b6fc4">schema: 1 × REQUIRED FIXED_LEN_BYTE_ARRAY</text>
+  <text x="72" y="618" class="mono" font-size="11.5" fill="#6b6fc4">column codec = <tspan fill="#4f46e5" font-weight="700">codecId</tspan></text>
+
+  <!-- row: footer len -->
+  <rect x="56" y="634" width="452" height="30" rx="6" fill="#eef0fe" stroke="#c9cdf7" stroke-width="1.2"/>
+  <text x="72" y="654" class="code" fill="#4338ca">footer length</text>
+  <text x="330" y="654" class="bodym" font-size="12">uint32, little-endian</text>
+
+  <!-- row: PAR1 -->
+  <rect x="56" y="668" width="452" height="30" rx="6" fill="#eef0fe" stroke="#c9cdf7" stroke-width="1.2"/>
+  <text x="72" y="688" class="code" fill="#4338ca">PAR1</text>
+  <text x="330" y="688" class="bodym" font-size="12">magic number</text>
+
+  <text x="56" y="722" class="bodym" font-size="12.5"><tspan fill="#4f46e5" font-weight="700" class="mono">codecId</tspan> and <tspan fill="#0d9488" font-weight="700" class="mono">usize</tspan> are the only two values you must supply.</text>
+
+  <!--  size oracle (right)  -->
+  <text x="548" y="372" class="cap">DERIVING <tspan class="mono" letter-spacing="0" fill="#0d9488">usize</tspan> — EVERY STREAM HIDES ITS OWN OUTPUT SIZE</text>
+
+  <rect x="548" y="384" width="676" height="314" rx="10" fill="#ffffff" stroke="#d9dde6" stroke-width="1.5"/>
+  <!-- header row -->
+  <rect x="548" y="384" width="676" height="40" rx="10" fill="#e6f5f3"/>
+  <rect x="548" y="410" width="676" height="14" fill="#e6f5f3"/>
+  <text x="570" y="409" class="tag" fill="#0b6b62">Codec</text>
+  <text x="740" y="409" class="tag" fill="#0b6b62">Where the decompressed size is written on the wire</text>
+
+  <!-- rows -->
+  <g class="body">
+    <text x="570" y="452" font-weight="700" fill="#14161f">Snappy</text>
+    <text x="740" y="452">LEB128 preamble varint at the head of the block</text>
+    <line x1="562" y1="466" x2="1210" y2="466" stroke="#eef0f3"/>
+
+    <text x="570" y="490" font-weight="700" fill="#14161f">GZip</text>
+    <text x="740" y="490">ISIZE trailer — the last 4 bytes (mod 2³²)</text>
+    <line x1="562" y1="504" x2="1210" y2="504" stroke="#eef0f3"/>
+
+    <text x="570" y="528" font-weight="700" fill="#14161f">Zstandard</text>
+    <text x="740" y="528">Frame_Content_Size in the frame header</text>
+    <line x1="562" y1="542" x2="1210" y2="542" stroke="#eef0f3"/>
+
+    <text x="570" y="566" font-weight="700" fill="#14161f">Brotli</text>
+    <text x="740" y="566">first meta-block MLEN, unpacked bit-by-bit</text>
+    <line x1="562" y1="580" x2="1210" y2="580" stroke="#eef0f3"/>
+
+    <text x="570" y="604" font-weight="700" fill="#14161f">LZ4 · hadoop</text>
+    <text x="740" y="604">4-byte big-endian size header (auto-detected)</text>
+    <line x1="562" y1="618" x2="1210" y2="618" stroke="#eef0f3"/>
+
+    <text x="570" y="642" font-weight="700" fill="#14161f">LZ4 · raw</text>
+    <text x="740" y="642">a token walk over the sequences — no decompression</text>
+  </g>
+
+  <!-- oracle note -->
+  <rect x="548" y="662" width="676" height="36" rx="8" fill="#f5f6f9"/>
+  <text x="568" y="685" class="bodym" font-size="12.5">Override with a 3rd arg when the stream genuinely omits it (zstd without content-size, split brotli).</text>
+
+  <!-- ============ BAND 3 — THE RESULT ============ -->
+  <circle cx="66" cy="760" r="12" fill="#0d9488"/>
+  <text x="66" y="765" text-anchor="middle" class="badge">3</text>
+  <text x="88" y="765" class="band">Read the single cell back</text>
+
+  <rect x="56" y="782" width="1168" height="70" rx="10" fill="#0f1729"/>
+  <text x="80" y="825" class="mono" font-size="16" fill="#e7ebf5">Parquet.Document(Binary.Buffer(wrapper))<tspan fill="#7dd3c0">{0}</tspan>[<tspan fill="#f2b880">payload</tspan>]</text>
+  <line x1="812" y1="817" x2="852" y2="817" stroke="#7dd3c0" stroke-width="1.6" marker-end="url(#arrowI)"/>
+  <text x="868" y="823" class="mono" font-size="16" font-weight="700" fill="#7dd3c0">decompressed bytes</text>
+
+  <text x="56" y="884" class="bodym" font-size="12.5">A wrong <tspan class="mono" fill="#0d9488" font-weight="700">usize</tspan> fails the Parquet read loudly — it can never return the wrong bytes silently.  ·  Standard library only: no connector, no external call, data never leaves the mashup engine.</text>
+</svg>

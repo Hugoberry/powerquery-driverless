@@ -6,6 +6,8 @@
 
 The engine contains all of those codecs anyway. `Parquet.Document` uses them every time it reads a compressed Parquet file. `Codec.Decompress` makes them callable from plain M by wrapping an arbitrary compressed stream in a minimal, spec-conformant Parquet file and letting `Parquet.Document` do the work. That construction is the "oracle": a documented API repurposed, through nothing but valid inputs, to compute something the standard library does not expose.
 
+![](codec-oracle-diagram.svg)
+
 ## Usage
 
 Paste [`Codec.Decompress.pq`](Codec.Decompress.pq) into a blank query and name the query `Codec.Decompress`. The argument convention mirrors `Binary.Decompress`:
