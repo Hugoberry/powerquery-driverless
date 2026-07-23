@@ -56,6 +56,13 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: PQDriverless.mez
+          # actions/upload-artifact always wraps the download in its own zip.
+          # Naming the artifact identically to the file it contains
+          # (PQDriverless.mez -> PQDriverless.mez.zip) makes Windows' default
+          # "Extract All" folder name collide with the real file name, so the
+          # extracted PQDriverless.mez looks like it contains itself and Power
+          # BI Desktop won't load it. Keep the artifact name distinct so the
+          # extracted file is unambiguous.
+          name: PQDriverless-mez
           path: tests/out/PQDriverless.mez
           if-no-files-found: error
