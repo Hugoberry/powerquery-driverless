@@ -27,6 +27,9 @@ Every reader here is plain M source. You paste it into a blank query and it work
 | dBASE / FoxPro reader (`.dbf` + `.fpt`/`.dbt`) | [`dbf/`](dbf/) | Working |
 | Windows Event Log reader (`.evtx`) | [`evtx/`](evtx/) | Working |
 | MATLAB MAT-file reader (`.mat`, v5-v7) | [`matlab/`](matlab/) | Working |
+| SPSS system file reader (`.sav`, `.zsav`) | [`spss/`](spss/) | Working |
+| Stata dataset reader (`.dta`, formats 113-119) | [`stata/`](stata/) | Working |
+| Apache Avro reader (`.avro`, OCF) | [`avro/`](avro/) | Working |
 | Legacy Excel reader (`.xls`, Excel 97-2003) | [`xls/`](xls/) | Working |
 | Excel Binary Workbook reader (`.xlsb`) | [`xlsb/`](xlsb/) | Working |
 | Codec oracle (Snappy, Brotli, Zstandard, LZ4) | [`codec-oracle/`](codec-oracle/) | Working |
@@ -52,13 +55,13 @@ Access is the format where the install pain is sharpest. A native connector exis
 ```m
 let
     Source = File.Contents("C:\data\example.accdb"),
-    Db     = Access.Database(Source),
+    Db     = AccessReader.Database(Source),
     Orders = Db{[Name = "Orders"]}[Data]
 in
     Orders
 ```
 
-See [`access/README.md`](access/README.md) for what's supported and the limitations, in particular around encrypted databases (detected, not supported) and Access 97 files.
+The name is `AccessReader.Database` rather than `Access.Database` because the latter is a built-in engine function: a query can shadow it, but a section document cannot declare it, so the two delivery paths would need two different names. See [`access/README.md`](access/README.md) for what's supported and the limitations, in particular around encrypted databases (detected, not supported) and Access 97 files.
 
 ### dBASE / FoxPro
 

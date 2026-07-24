@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Access.Database.pq — read Microsoft Access databases (.mdb, .accdb) in pure Power Query M.
+// AccessReader.Database.pq — read Microsoft Access databases (.mdb, .accdb) in pure Power Query M.
 // No ACE OLEDB provider, no ODBC driver, no bitness gamble, no gateway software required.
-// Paste into a blank query (name it Access.Database), or wrap as a function in your PBIX / dataflow.
+// Paste into a blank query (name it AccessReader.Database), or wrap as a function in your PBIX / dataflow.
+//
+// The name is deliberately not Access.Database: that is a built-in engine function,
+// and a section document that declares `shared Access.Database` fails to compile,
+// so the pasted and the packaged reader would otherwise need different names.
 //
 // Usage:
 //   let
-//       Access.Database = <this expression>,
-//       db  = Access.Database(File.Contents("C:\path\to\your.accdb")),  // nav table of tables
+//       AccessReader.Database = <this expression>,
+//       db  = AccessReader.Database(File.Contents("C:\path\to\your.accdb")),  // nav table of tables
 //       tbl = db{[Name = "MyTable"]}[Data]
 //   in
 //       tbl

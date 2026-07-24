@@ -16,13 +16,18 @@ gateway, just a standard one with nothing installed on it.
 
 ## Usage
 
-Paste [`Access.Database.pq`](Access.Database.pq) into a blank query and name the
-query `Access.Database`. Power Query treats a query whose expression is a function
-as an invocable function.
+Paste [`AccessReader.Database.pq`](AccessReader.Database.pq) into a blank query and
+name the query `AccessReader.Database`. Power Query treats a query whose expression
+is a function as an invocable function.
+
+The name avoids `Access.Database` on purpose. That one is a built-in engine
+function; a query can shadow it, but a section document cannot declare
+`shared Access.Database` at all — the module fails to compile — so the pasted
+reader and the one inside `PQDriverless.mez` would end up with different names.
 
 ```m
 let
-    db  = Access.Database(File.Contents("C:\data\example.accdb")),
+    db  = AccessReader.Database(File.Contents("C:\data\example.accdb")),
     tbl = db{[Name = "MyTable"]}[Data]
 in
     tbl

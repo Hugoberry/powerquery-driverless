@@ -26,13 +26,15 @@ param(
 $ErrorActionPreference = "Stop"
 
 # folder => .pq files exposed as section members (member name = file name sans .pq)
+#
+# A file name that collides with a built-in engine function aborts the whole
+# module compile, so readers are named to avoid one - AccessReader.Database
+# rather than Access.Database. Keep new readers clear of the built-in namespace.
 $Readers = @(
     "sqlite3", "gpkg", "mbtiles", "access", "avro", "dbf",
     "evtx", "matlab", "spss", "stata", "xls", "xlsb",
     "crc32", "codec-oracle"
 )
-
-$Renames = @{ "Access.Database" = "AccessReader.Database" }
 
 New-Item $OutDir -ItemType Directory -Force | Out-Null
 
@@ -56,9 +58,6 @@ foreach ($dir in $Readers) {
     if (-not (Test-Path $full)) { continue }
     foreach ($pq in Get-ChildItem $full -Filter *.pq -File) {
         $name = $pq.BaseName
-        # Names that collide with built-in engine functions abort the whole
-        # module compile, so those readers are exported under a test-only name.
-        if ($Renames.ContainsKey($name)) { $name = $Renames[$name] }
         $body = Get-Content $pq.FullName -Raw
         [void]$sb.AppendLine("// ==== $dir/$($pq.Name) ====")
         [void]$sb.AppendLine("shared $name =")
