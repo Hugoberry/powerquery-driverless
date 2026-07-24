@@ -8,8 +8,98 @@ mainstream ODBC driver). This report grows as pairings and machines are
 added; per-machine raw data lives in
 `tests/perf/results/<hostname>[-<label>].json+md`.
 
-Updated **21 Jul 2026** · 1 machine · 5 ODBC + 9 script pairings · 2 scales
-(1x and 10x) · the `61cb250` xlsb fix included throughout.
+Updated **24 Jul 2026** · 1 machine · 5 ODBC + 9 script pairings · 2 scales
+(1x and 10x). Parts 1 and 2 below are the 21 Jul same-session native baselines
+(`61cb250` xlsb fix throughout); the **driverless refresh (24 Jul)** section
+directly beneath re-times only the pure-M side after two readers changed, and
+adds an integer-path A/B for the sqlite3 reader.
+
+---
+
+# Driverless refresh — 24 Jul 2026
+
+Two readers changed after the 21 Jul baseline: sqlite3's `DecodeValue`
+(`e3350e5`, integer serial types now dispatch to hoisted `BinaryFormat` readers)
+and xls's grid assembly (`dbe95e5`, the records-as-dictionary path replaced with
+a buffered run-cursor). Nothing else did. So this pass re-times **only the
+driverless side** of all 12 readers, keeps the 21 Jul native evals, and uses the
+ten unchanged readers as **drift controls**: the median of their new/old
+driverless ratio is the machine-speed factor everything else is read against.
+Harness: `run-driverless-benchmark.ps1` (driverless-only, retains native from the
+prior full run). Raw data: `results/WOOM-driverless[-10x].json+md`.
+
+## The two headline findings
+
+- **sqlite3 on `bulk.db` is unchanged** — 0.994x (1x) / 0.986x (10x) vs the
+  21 Jul driverless eval, inside the machine drift. This is expected and correct:
+  `e3350e5` only touches integer serial types 1–6, and the standard fixture
+  stores its integers as a rowid and 0/1 (serial-type specials 8/9), so the
+  rewritten path never runs. The change is a correctness fix there, not a speedup.
+- **sqlite3 on integer-heavy data is ~11% faster** — the win the standard
+  fixture cannot show. A dedicated fixture (`bulk-int.db`, 300k rows × six INTEGER
+  columns spanning serial types 1–6, signs mixed) was A/B'd old-code vs new-code
+  in one session:
+
+  | sqlite3 code | integer-decode eval | fold | value checksum |
+  |---|---:|---:|---:|
+  | old — `IntBE` (`Binary.ToList` accumulate + `Number.Power` sign) | 28 828 ms | 2 100 000 | 23 283 749 964 |
+  | new — hoisted `BinaryFormat.SignedInteger16/32/64` dispatch | 25 784 ms | 2 100 000 | 23 283 749 964 |
+
+  Same value out of both (fold and a mod-1e6 checksum reconstructed from a correct
+  decode), so the rewrite is value-neutral; the new dispatch is **1.12x faster
+  (−10.6%)** per integer cell. Harness: `ab-sqlite-intdecode.ps1`.
+
+- **xls got materially faster** (the `dbe95e5` grid port, not sqlite): driverless
+  eval 0.833x (1x) / 0.712x (10x) vs 21 Jul — roughly 22% beyond machine drift at
+  10x — which narrows its gap to the ACE Excel driver from **7.52x to 5.35x**.
+
+## Refreshed driverless evals (WOOM, 24 Jul 2026)
+
+Driverless eval only (median of 5, minus the trivial-query overhead). Native
+evals are **retained** from 21 Jul (not re-timed); the ratio is fresh
+driverless over that retained native. "drift" is new/old driverless eval — for a
+control reader it is pure machine speed; the control median is the yardstick.
+
+**10x — the meaningful scale** (overhead 2 717 ms; control-median drift **0.919x**):
+
+| pairing | ctl | driverless eval (ms) 24 Jul | 21 Jul | drift | retained native eval (ms) | ratio vs native |
+|---|:--:|---:|---:|---:|---:|---:|
+| sqlite3 |   | 113 498 | 115 086 | 0.986x | 7 564 (odbc) | 15.01x |
+| xls     |   | 5 935  | 8 340  | **0.712x** | 1 109 (odbc) | 5.35x |
+| xlsb    | • | 21 381 | 22 869 | 0.935x | 2 291 (odbc) | 9.33x |
+| access  | • | 10 725 | 10 867 | 0.987x | 1 615 (odbc) | 6.64x |
+| dbf     | • | 5 208  | 5 795  | 0.899x | 2 571 (odbc) | 2.03x |
+| avro    | • | 9 635  | 9 619  | 1.002x | 2 268 (py)   | 4.25x |
+| evtx    | • | 18 506 | 20 138 | 0.919x | 73 (py)      | 253.5x |
+| stata   | • | 10 823 | 11 596 | 0.933x | 169 py · 603 r | 64.0x · 18.0x |
+| spss    | • | 12 988 | 15 947 | 0.814x | 858 py · 506 r | 15.1x · 25.7x |
+| matlab  | • | 2 788  | 3 783  | 0.737x | 510 (py)     | 5.47x |
+| gpkg    | • | 14 317 | 16 867 | 0.849x | 127 (py)     | 112.7x |
+| mbtiles | • | 6 628  | 8 475  | 0.782x | 394 (py)     | 16.8x |
+
+Every fresh output matched its 21 Jul value exactly (the runner's regression
+gate), so these are like-for-like. The two non-control readers separate cleanly:
+xls at 0.712x sits well below the 0.919 control median (real code win), sqlite3
+at 0.986x sits just above it (no change on this fixture). The controls span
+0.74–1.00x around the 0.919 median — unchanged code, so that spread is machine
+noise/thermal, and it is why only a gap the size of xls's is called a win.
+
+**1x — setup-bound, kept for completeness** (overhead 2 519 ms; control-median
+drift **0.974x**): sqlite3 11 817 ms (0.994x, flat), xls 1 078 ms (0.833x,
+faster), the rest within a noisier ±25% control band (1x evals are small, so
+overhead-subtraction dominates — the report's standing caveat). Full data in
+`results/WOOM-driverless.json`.
+
+## How to read the refresh against Parts 1–2
+
+The native columns and their ratios in Parts 1–2 are the 21 Jul **same-session**
+truth. This refresh changes only two driverless numbers of interest — xls (now
+~29% faster at 10x) and sqlite3-on-integers (the A/B, +11%) — and leaves the
+qualitative picture intact: driverless trades decode throughput for zero install,
+native wins at scale, the gaps are order-of-magnitude for the script formats. The
+retained-native ratios above are within ~10% of a same-session figure (the
+machine drifted ~8% at 10x); they are not restated as portable truth, they show
+that xls's gap narrowed and sqlite3's held.
 
 ---
 

@@ -1,0 +1,423 @@
+{
+  "schema": 3,
+  "kind": "driverless-only",
+  "method": {
+    "label": "10x",
+    "runs": 5,
+    "statistic": "median",
+    "timing": "wall clock of one PQTest.exe compare per run, warm file cache; eval = median - overhead median",
+    "query": "full decode: List.Sum(List.Transform(Table.ToRows(t), List.NonNullCount))",
+    "nativeSource": "retained from prior full run (WOOM-10x.json / WOOM-scripts-10x.json); native NOT re-timed this round",
+    "drift": "machineDrift = median over control readers of (new driverless eval / prior driverless eval); ratios vs native are cross-session, divide native comparison by machineDrift to normalise"
+  },
+  "environment": {
+    "machine": "WOOM",
+    "timestamp": "2026-07-24T13:43:58+01:00",
+    "cpu": "12th Gen Intel(R) Core(TM) i7-1260P",
+    "cores": 12,
+    "logicalCpus": 16,
+    "ramGB": 31.7,
+    "disk": "SAMSUNG MZVL21T0HCLR-00BL7 (SSD, NVMe)",
+    "os": "Microsoft Windows 11 Pro build 26200",
+    "powerPlan": "Balanced",
+    "pqTestVersion": "2.155.2.0",
+    "office": "16.0.20131.20154"
+  },
+  "controls": [
+    "xlsb",
+    "access",
+    "dbf",
+    "avro",
+    "evtx",
+    "stata",
+    "spss",
+    "matlab",
+    "gpkg",
+    "mbtiles"
+  ],
+  "machineDrift": 0.919,
+  "overheadMs": {
+    "runsMs": [
+      2643.0,
+      2717.0,
+      2725.0,
+      2700.0,
+      2750.0
+    ],
+    "medianMs": 2717.0
+  },
+  "pairings": [
+    {
+      "name": "sqlite3",
+      "status": "measured",
+      "isControl": false,
+      "fixture": "bulk.db, 57.6 MB, sha256 29f16049f4e1ee7d07ef4722f7dc5cfcabea6422252bc92ce679d01f5285a658",
+      "output": "8000000",
+      "priorOutput": "8000000",
+      "outputMatch": true,
+      "driverless": {
+        "runsMs": [
+          117818.0,
+          117534.0,
+          116215.0,
+          115813.0,
+          115002.0
+        ],
+        "medianMs": 116215.0,
+        "evalMs": 113498.0
+      },
+      "priorDlEvalMs": 115086.0,
+      "driftVsPrior": 0.986,
+      "natives": [
+        {
+          "engine": "odbc",
+          "driver": "0.99991 (C:\\WINDOWS\\system32\\sqlite3odbc.dll)",
+          "evalMs": 7564.0,
+          "ratio": 15.01
+        }
+      ]
+    },
+    {
+      "name": "xlsb",
+      "status": "measured",
+      "isControl": true,
+      "fixture": "bulk-ace.xlsb, 1 MB, sha256 cfcda4784d111e31665d58e2e0c81cff45c2274c27d6b13627029f9447c03715",
+      "output": "400000",
+      "priorOutput": "400000",
+      "outputMatch": true,
+      "driverless": {
+        "runsMs": [
+          23899.0,
+          23983.0,
+          24159.0,
+          24098.0,
+          24556.0
+        ],
+        "medianMs": 24098.0,
+        "evalMs": 21381.0
+      },
+      "priorDlEvalMs": 22869.0,
+      "driftVsPrior": 0.935,
+      "natives": [
+        {
+          "engine": "odbc",
+          "driver": "16.0.20131.20012 (C:\\Program Files\\Microsoft Office\\root\\VFS\\ProgramFilesCommonX64\\Microsoft Shared\\Office16\\ACEODBC.DLL)",
+          "evalMs": 2291.0,
+          "ratio": 9.33
+        }
+      ]
+    },
+    {
+      "name": "xls",
+      "status": "measured",
+      "isControl": false,
+      "fixture": "bulk-ace.xls, 3.7 MB, sha256 8b220f966c60ff3df9f09572556c2812d9d38dcacc7bfbc1617b3d1a0f6f2c2b",
+      "output": "195000",
+      "priorOutput": "195000",
+      "outputMatch": true,
+      "driverless": {
+        "runsMs": [
+          8355.0,
+          8431.0,
+          8679.0,
+          8652.0,
+          8798.0
+        ],
+        "medianMs": 8652.0,
+        "evalMs": 5935.0
+      },
+      "priorDlEvalMs": 8340.0,
+      "driftVsPrior": 0.712,
+      "natives": [
+        {
+          "engine": "odbc",
+          "driver": "16.0.20131.20012 (C:\\Program Files\\Microsoft Office\\root\\VFS\\ProgramFilesCommonX64\\Microsoft Shared\\Office16\\ACEODBC.DLL)",
+          "evalMs": 1109.0,
+          "ratio": 5.35
+        }
+      ]
+    },
+    {
+      "name": "access",
+      "status": "measured",
+      "isControl": true,
+      "fixture": "bulk-ace.accdb, 9.6 MB, sha256 c5ddf2950f8844240123a329deef41b2a4afe629c489a823a9747eb93ce8dce3",
+      "output": "800000",
+      "priorOutput": "800000",
+      "outputMatch": true,
+      "driverless": {
+        "runsMs": [
+          13565.0,
+          13598.0,
+          13439.0,
+          13442.0,
+          13293.0
+        ],
+        "medianMs": 13442.0,
+        "evalMs": 10725.0
+      },
+      "priorDlEvalMs": 10867.0,
+      "driftVsPrior": 0.987,
+      "natives": [
+        {
+          "engine": "odbc",
+          "driver": "16.0.20131.20012 (C:\\Program Files\\Microsoft Office\\root\\VFS\\ProgramFilesCommonX64\\Microsoft Shared\\Office16\\ACEODBC.DLL)",
+          "evalMs": 1615.0,
+          "ratio": 6.64
+        }
+      ]
+    },
+    {
+      "name": "dbf",
+      "status": "measured",
+      "isControl": true,
+      "fixture": "bulk.dbf, 8.2 MB, sha256 2ab11f16a3bef306f6b1b63b4388d155c138cca78dbf8fdacfea682b3894cbe0",
+      "output": "600000",
+      "priorOutput": "600000",
+      "outputMatch": true,
+      "driverless": {
+        "runsMs": [
+          7925.0,
+          7987.0,
+          7934.0,
+          7821.0,
+          7915.0
+        ],
+        "medianMs": 7925.0,
+        "evalMs": 5208.0
+      },
+      "priorDlEvalMs": 5795.0,
+      "driftVsPrior": 0.899,
+      "natives": [
+        {
+          "engine": "odbc",
+          "driver": "16.0.20131.20012 (C:\\Program Files\\Microsoft Office\\root\\VFS\\ProgramFilesCommonX64\\Microsoft Shared\\Office16\\ACEODBC.DLL)",
+          "evalMs": 2571.0,
+          "ratio": 2.03
+        }
+      ]
+    },
+    {
+      "name": "avro",
+      "status": "measured",
+      "isControl": true,
+      "fixture": "bulk.avro, 34.8 MB, sha256 2cf4eb1120e581aeba4b0f96201376c583fd5c1d2111f0f3a27602fe762f8838",
+      "output": "6000000",
+      "priorOutput": "6000000",
+      "outputMatch": true,
+      "driverless": {
+        "runsMs": [
+          12386.0,
+          12364.0,
+          12305.0,
+          12194.0,
+          12352.0
+        ],
+        "medianMs": 12352.0,
+        "evalMs": 9635.0
+      },
+      "priorDlEvalMs": 9619.0,
+      "driftVsPrior": 1.002,
+      "natives": [
+        {
+          "engine": "python",
+          "parityTier": 1,
+          "evalMs": 2268,
+          "ratio": 4.25
+        }
+      ]
+    },
+    {
+      "name": "evtx",
+      "status": "measured",
+      "isControl": true,
+      "fixture": "bulk.evtx, 5.3 MB, sha256 6f315672182893e6e61df7dd4791b952a9de69a5e633b8f3e9708119a948f71d",
+      "output": "240000",
+      "priorOutput": "240000",
+      "outputMatch": true,
+      "driverless": {
+        "runsMs": [
+          21223.0,
+          21185.0,
+          21207.0,
+          21240.0,
+          21378.0
+        ],
+        "medianMs": 21223.0,
+        "evalMs": 18506.0
+      },
+      "priorDlEvalMs": 20138.0,
+      "driftVsPrior": 0.919,
+      "natives": [
+        {
+          "engine": "python",
+          "parityTier": 2,
+          "evalMs": 73,
+          "ratio": 253.51
+        }
+      ]
+    },
+    {
+      "name": "stata",
+      "status": "measured",
+      "isControl": true,
+      "fixture": "bulk.dta, 17.6 MB, sha256 a9e3e81f046956d9635e3aed066e0961fca77d67d067edc946c7f63a338859ec",
+      "output": "2000000",
+      "priorOutput": "2000000",
+      "outputMatch": true,
+      "driverless": {
+        "runsMs": [
+          13314.0,
+          13481.0,
+          13585.0,
+          13540.0,
+          13814.0
+        ],
+        "medianMs": 13540.0,
+        "evalMs": 10823.0
+      },
+      "priorDlEvalMs": 11596.0,
+      "driftVsPrior": 0.933,
+      "natives": [
+        {
+          "engine": "python",
+          "parityTier": 1,
+          "evalMs": 169,
+          "ratio": 64.04
+        },
+        {
+          "engine": "r",
+          "parityTier": 1,
+          "evalMs": 603,
+          "ratio": 17.95
+        }
+      ]
+    },
+    {
+      "name": "spss",
+      "status": "measured",
+      "isControl": true,
+      "fixture": "bulk.sav, 15.3 MB, sha256 d4374275d592ae848044fe7d8a52906840be70d9d2cade0603d6fce9705bf569",
+      "output": "1600000",
+      "priorOutput": "1600000",
+      "outputMatch": true,
+      "driverless": {
+        "runsMs": [
+          15705.0,
+          15755.0,
+          15827.0,
+          15670.0,
+          15675.0
+        ],
+        "medianMs": 15705.0,
+        "evalMs": 12988.0
+      },
+      "priorDlEvalMs": 15947.0,
+      "driftVsPrior": 0.814,
+      "natives": [
+        {
+          "engine": "python",
+          "parityTier": 1,
+          "evalMs": 858,
+          "ratio": 15.14
+        },
+        {
+          "engine": "r",
+          "parityTier": 1,
+          "evalMs": 506,
+          "ratio": 25.67
+        }
+      ]
+    },
+    {
+      "name": "matlab",
+      "status": "measured",
+      "isControl": true,
+      "fixture": "bulk.mat, 9.5 MB, sha256 1e08c4ab02b6c5e1adc14da13916d43f183f471d3de7f7f96ca0cabd8016a5cc",
+      "output": "1200000",
+      "priorOutput": "1200000",
+      "outputMatch": true,
+      "driverless": {
+        "runsMs": [
+          5522.0,
+          5466.0,
+          5458.0,
+          5505.0,
+          5570.0
+        ],
+        "medianMs": 5505.0,
+        "evalMs": 2788.0
+      },
+      "priorDlEvalMs": 3783.0,
+      "driftVsPrior": 0.737,
+      "natives": [
+        {
+          "engine": "python",
+          "parityTier": 1,
+          "evalMs": 510,
+          "ratio": 5.47
+        }
+      ]
+    },
+    {
+      "name": "gpkg",
+      "status": "measured",
+      "isControl": true,
+      "fixture": "bulk.gpkg, 8.4 MB, sha256 59b15508b1f8ddb1c00751b087085c934b8880d32f4d268f7760cd17f4da7b4d",
+      "output": "600000",
+      "priorOutput": "600000",
+      "outputMatch": true,
+      "driverless": {
+        "runsMs": [
+          16973.0,
+          17020.0,
+          17102.0,
+          17473.0,
+          17034.0
+        ],
+        "medianMs": 17034.0,
+        "evalMs": 14317.0
+      },
+      "priorDlEvalMs": 16867.0,
+      "driftVsPrior": 0.849,
+      "natives": [
+        {
+          "engine": "python",
+          "parityTier": 1,
+          "evalMs": 127,
+          "ratio": 112.73
+        }
+      ]
+    },
+    {
+      "name": "mbtiles",
+      "status": "measured",
+      "isControl": true,
+      "fixture": "bulk.mbtiles, 45.1 MB, sha256 cb8888671c9fb26942743f8527f7f13ef39087689cb28b54ed88b38ab7cb3d40",
+      "output": "41281308",
+      "priorOutput": "41281308",
+      "outputMatch": true,
+      "driverless": {
+        "runsMs": [
+          9492.0,
+          9318.0,
+          9386.0,
+          9295.0,
+          9345.0
+        ],
+        "medianMs": 9345.0,
+        "evalMs": 6628.0
+      },
+      "priorDlEvalMs": 8475.0,
+      "driftVsPrior": 0.782,
+      "natives": [
+        {
+          "engine": "python",
+          "parityTier": 1,
+          "evalMs": 394,
+          "ratio": 16.82
+        }
+      ]
+    }
+  ]
+}
