@@ -3,6 +3,10 @@ name: PQ tests
 on:
   pull_request:
     branches: [main]
+  push:
+    # A vX.Y.Z tag runs the full suite and, only if it passes, publishes the
+    # release. The release asset is therefore always a tested build.
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       sqlite_rows:
@@ -35,8 +39,19 @@ jobs:
       - name: Install Microsoft.PowerQuery.SdkTools
         run: nuget install Microsoft.PowerQuery.SdkTools -OutputDirectory .pqtools -NonInteractive
 
+      # On a tag build the section document's [Version] is the tag; every other
+      # trigger gets the 0.0.0 placeholder, so an unreleased mez is never
+      # mistaken for a released one.
+      - name: Resolve module version
+        id: ver
+        shell: pwsh
+        run: |
+          $v = if ($env:GITHUB_REF_NAME -match '^v(\d+\.\d+\.\d+)$') { $Matches[1] } else { '0.0.0' }
+          Write-Host "Module version: $v"
+          "version=$v" | Out-File $env:GITHUB_OUTPUT -Append
+
       - name: Build PQDriverless.mez
-        run: pwsh tests/build-mez.ps1
+        run: pwsh tests/build-mez.ps1 -Version ${{ steps.ver.outputs.version }}
 
       - name: Run PQTest suite
         run: pwsh tests/run-tests.ps1
@@ -66,3 +81,30 @@ jobs:
           name: PQDriverless-mez
           path: tests/out/PQDriverless.mez
           if-no-files-found: error
+
+  # Publishes the tested mez as a release asset, so the download link in the
+  # docs (releases/latest/download/PQDriverless.mez) is permanent and works
+  # without a GitHub account - unlike an Actions artifact, which expires and
+  # requires a signed-in user.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: pqtest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download the tested mez
+        uses: actions/download-artifact@v4
+        with:
+          name: PQDriverless-mez
+          path: dist
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME"
+          dist/PQDriverless.mez
+          --repo "$GITHUB_REPOSITORY"
+          --title "$GITHUB_REF_NAME"
+          --generate-notes

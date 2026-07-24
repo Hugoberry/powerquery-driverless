@@ -14,11 +14,18 @@
 #                      query is timed, and the produced output value is shown
 #                      in the report. Pass = query evaluated without error.
 #
-# Usage: pwsh tests/run-tests.ps1 [-PqTest <path\PQTest.exe>] [-Mez <path>]
+# Both packages are load-checked before any query runs; only the tests package
+# has queries run against it.
+#
+# Usage: pwsh tests/run-tests.ps1 [-PqTest <path\PQTest.exe>] [-Mez <path>] [-SlimMez <path>]
 
 param(
     [string]$PqTest,
     [string]$Mez       = (Join-Path $PSScriptRoot "out/PQDriverless.tests.mez"),
+    # The distributable. No queries run against it - it holds no fixtures - but
+    # it is load-checked, because it is the artifact users actually install and
+    # it is the one build nothing else exercises.
+    [string]$SlimMez   = (Join-Path $PSScriptRoot "out/PQDriverless.mez"),
     [string]$ToolsDir  = (Join-Path (Split-Path $PSScriptRoot -Parent) ".pqtools"),
     [string]$ReportDir = (Join-Path $PSScriptRoot "out")
 )
@@ -31,8 +38,6 @@ if (-not $PqTest) {
     if (-not $found) { throw "PQTest.exe not found under $ToolsDir. nuget install Microsoft.PowerQuery.SdkTools -OutputDirectory $ToolsDir" }
     $PqTest = $found.FullName
 }
-if (-not (Test-Path $Mez)) { throw "$Mez not found. Run tests/build-mez.ps1 first." }
-
 $LogDir = Join-Path $ReportDir "logs"
 New-Item $LogDir -ItemType Directory -Force | Out-Null
 
@@ -40,14 +45,28 @@ New-Item $LogDir -ItemType Directory -Force | Out-Null
 # so every step below validates the JSON it prints, never the exit code alone.
 
 # ---- sanity: does the module load, and what does it export? ----
-$infoLog = Join-Path $LogDir "_info.log"
-& $PqTest info -e $Mez -p > $infoLog 2>&1
-$info = Get-Content $infoLog -Raw
-try { $infoJson = $info | ConvertFrom-Json } catch { Write-Host $info; throw "PQTest info produced no JSON." }
-$broken = @($infoJson) | Where-Object { $_.ErrorStatus }
-if ($broken) {
-    throw "Extension module failed to compile: $($broken.ErrorStatus -join '; ')"
+function Assert-ModuleLoads {
+    param([string]$MezPath, [string]$LogName)
+
+    if (-not (Test-Path $MezPath)) { throw "$MezPath not found. Run tests/build-mez.ps1 first." }
+
+    $infoLog = Join-Path $LogDir $LogName
+    & $PqTest info -e $MezPath -p > $infoLog 2>&1
+    $info = Get-Content $infoLog -Raw
+    try { $infoJson = $info | ConvertFrom-Json }
+    catch { Write-Host $info; throw "PQTest info produced no JSON for $MezPath." }
+    $broken = @($infoJson) | Where-Object { $_.ErrorStatus }
+    if ($broken) {
+        throw "Extension module $MezPath failed to compile: $($broken.ErrorStatus -join '; ')"
+    }
+    Write-Host "Module loads: $MezPath"
 }
+
+# The distributable carries no data source kind at all - it publishes plain
+# functions and asks for no credentials - so this check is what proves a
+# kind-less module still compiles and loads before one ships.
+Assert-ModuleLoads $SlimMez "_info-slim.log"
+Assert-ModuleLoads $Mez     "_info.log"
 
 # ---- anonymous credential for the PQDriverless data source kind ----
 # CI has no interactive stdin, which puts set-credential into JSON mode, so

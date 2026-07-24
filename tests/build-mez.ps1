@@ -7,8 +7,10 @@
 #                           Extension.Contents and stay path-free. Consumed by
 #                           run-tests.ps1 and the perf harnesses; not shipped.
 #
-# The section document (the actual reader code) is identical in both; only the
-# tests mez carries fixtures.
+# The reader code is identical in both. The tests package additionally carries
+# the fixtures and the test-only PQDriverless.Fixture accessor that serves them;
+# neither is present in the distributable, which exports readers and nothing
+# else.
 #
 # A .mez is a zip. Layout of the tests package:
 #   PQDriverless.pq          section document (generated below)
@@ -16,11 +18,14 @@
 #   perf.<fixture>           CI-generated large fixtures, if present
 # The slim package contains PQDriverless.pq alone.
 #
-# Usage: pwsh tests/build-mez.ps1 [-RepoRoot <path>] [-OutDir <path>]
+# Usage: pwsh tests/build-mez.ps1 [-RepoRoot <path>] [-OutDir <path>] [-Version <x.y.z>]
 
 param(
     [string]$RepoRoot = (Split-Path $PSScriptRoot -Parent),
-    [string]$OutDir   = (Join-Path $PSScriptRoot "out")
+    [string]$OutDir   = (Join-Path $PSScriptRoot "out"),
+    # Stamped into the section document's [Version] attribute. The release
+    # workflow passes the git tag; everything else gets the placeholder.
+    [string]$Version  = "0.0.0"
 )
 
 $ErrorActionPreference = "Stop"
@@ -39,34 +44,58 @@ $Readers = @(
 New-Item $OutDir -ItemType Directory -Force | Out-Null
 
 # ---- section document ----
-# The Fixture accessor is the module's (anonymous) data source function: test
-# queries cannot call Extension.Contents themselves, so fixtures are served
-# through it. Its parameter is optional on purpose - optional parameters stay
-# out of the data source path, so one anonymous credential covers every call.
-$sb = [System.Text.StringBuilder]::new()
-[void]$sb.AppendLine('[Version = "1.0.0"]')
-[void]$sb.AppendLine('section PQDriverless;')
-[void]$sb.AppendLine('')
-[void]$sb.AppendLine('PQDriverless = [ Authentication = [ Anonymous = [] ], Label = "PQDriverless test module" ];')
-[void]$sb.AppendLine('')
-[void]$sb.AppendLine('[DataSource.Kind = "PQDriverless"]')
-[void]$sb.AppendLine('shared PQDriverless.Fixture = (optional name as text) as binary => Extension.Contents(name);')
-[void]$sb.AppendLine('')
+# Built twice. The distributable exports the readers and nothing else: no data
+# source kind, no credential label, no fixture accessor. Anything test-only that
+# ships in it is user-visible surface that always fails when called, and the
+# credential label is what a user would be shown if the engine ever prompted.
+#
+# The tests build adds the Fixture accessor, which is the module's (anonymous)
+# data source function: test queries cannot call Extension.Contents themselves,
+# so fixtures are served through it. Its parameter is optional on purpose -
+# optional parameters stay out of the data source path, so one anonymous
+# credential covers every call.
+function New-SectionDoc {
+    param([switch]$WithFixtures)
 
-foreach ($dir in $Readers) {
-    $full = Join-Path $RepoRoot $dir
-    if (-not (Test-Path $full)) { continue }
-    foreach ($pq in Get-ChildItem $full -Filter *.pq -File) {
-        $name = $pq.BaseName
-        $body = Get-Content $pq.FullName -Raw
-        [void]$sb.AppendLine("// ==== $dir/$($pq.Name) ====")
-        [void]$sb.AppendLine("shared $name =")
-        [void]$sb.AppendLine($body.TrimEnd())
-        [void]$sb.AppendLine(";")
-        [void]$sb.AppendLine("")
+    $sb = [System.Text.StringBuilder]::new()
+    [void]$sb.AppendLine("[Version = ""$Version""]")
+    [void]$sb.AppendLine('section PQDriverless;')
+    [void]$sb.AppendLine('')
+
+    if ($WithFixtures) {
+        [void]$sb.AppendLine('PQDriverless = [ Authentication = [ Anonymous = [] ], Label = "PQDriverless test module" ];')
+        [void]$sb.AppendLine('')
+        [void]$sb.AppendLine('[DataSource.Kind = "PQDriverless"]')
+        [void]$sb.AppendLine('shared PQDriverless.Fixture = (optional name as text) as binary => Extension.Contents(name);')
+        [void]$sb.AppendLine('')
+    }
+
+    foreach ($dir in $Readers) {
+        $full = Join-Path $RepoRoot $dir
+        if (-not (Test-Path $full)) { continue }
+        foreach ($pq in Get-ChildItem $full -Filter *.pq -File) {
+            $name = $pq.BaseName
+            $body = Get-Content $pq.FullName -Raw
+            [void]$sb.AppendLine("// ==== $dir/$($pq.Name) ====")
+            [void]$sb.AppendLine("shared $name =")
+            [void]$sb.AppendLine($body.TrimEnd())
+            [void]$sb.AppendLine(";")
+            [void]$sb.AppendLine("")
+        }
+    }
+    $sb.ToString()
+}
+
+$SlimDoc  = New-SectionDoc
+$TestsDoc = New-SectionDoc -WithFixtures
+
+# The whole point of the split, asserted rather than assumed: a refactor that
+# leaks the test harness back into the distributable fails the build here.
+foreach ($needle in @("PQDriverless.Fixture", "Extension.Contents", "DataSource.Kind", "test module")) {
+    if ($SlimDoc -match [regex]::Escape($needle)) {
+        throw "Distributable section document contains test-only surface: '$needle'"
     }
 }
-$SectionDoc = $sb.ToString()
 
 # ---- stage both packages ----
 $StageRoot = Join-Path $OutDir "stage"
@@ -76,8 +105,8 @@ $FullStage = Join-Path $StageRoot "full"
 New-Item $SlimStage -ItemType Directory -Force | Out-Null
 New-Item $FullStage -ItemType Directory -Force | Out-Null
 
-Set-Content (Join-Path $SlimStage "PQDriverless.pq") $SectionDoc -Encoding UTF8
-Set-Content (Join-Path $FullStage "PQDriverless.pq") $SectionDoc -Encoding UTF8
+Set-Content (Join-Path $SlimStage "PQDriverless.pq") $SlimDoc  -Encoding UTF8
+Set-Content (Join-Path $FullStage "PQDriverless.pq") $TestsDoc -Encoding UTF8
 
 # ---- fixtures (tests package only) ----
 $SkipExt = @(".py", ".md", ".java", ".pyc")
@@ -109,8 +138,8 @@ function New-Mez {
     Move-Item $ZipPath $MezPath
 
     $count = (Get-ChildItem $StageDir -File).Count
-    Write-Host ("Built {0} ({1} files, {2} MB)" -f `
-        $MezPath, $count, [math]::Round((Get-Item $MezPath).Length / 1MB, 1))
+    Write-Host ("Built {0} v{1} ({2} files, {3} MB)" -f `
+        $MezPath, $Version, $count, [math]::Round((Get-Item $MezPath).Length / 1MB, 1))
 }
 
 New-Mez $SlimStage (Join-Path $OutDir "PQDriverless.mez")

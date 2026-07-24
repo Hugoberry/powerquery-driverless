@@ -9,26 +9,41 @@ on pull requests and manual dispatch) or locally on any Windows machine.
 
 1. `build-mez.ps1` assembles a generated section document that exposes every
    reader `.pq` as a shared member (`Sqlite3.Database`, `Dbf.Table`, ...) and
-   packages it into two `.mez` files. **PQDriverless.mez** is slim - the
-   section document alone; it is the distributable connector to load in Power
-   BI. **PQDriverless.tests.mez** carries the same section document plus every
-   fixture from each reader's `test/` folder embedded as a resource named
-   `<reader>.<file>`, and is what the test and perf harnesses run against.
-   `Extension.Contents` only exists inside the module, so the section also
-   defines an anonymous data source function `PQDriverless.Fixture(optional
-   name)` that serves the embedded fixtures to test queries
-   (`PQDriverless.Fixture("dbf.vfp.dbf")`); the parameter is optional so the
-   data source path stays constant and one anonymous credential covers
-   everything. Because gpkg/mbtiles call `Sqlite3.Database` as a sibling query,
-   the section document satisfies that reference naturally.
+   packages it into two `.mez` files. Because gpkg/mbtiles call
+   `Sqlite3.Database` as a sibling query, the section document satisfies that
+   reference naturally.
+
+   **PQDriverless.mez** is the distributable connector to load in Power BI. It
+   contains the readers and nothing else: no data source kind, no credential
+   label, no fixture accessor. It publishes plain functions that take a binary,
+   so it needs no credentials of its own and adds no Get Data entry. The build
+   asserts this rather than assuming it - a refactor that leaks test-only
+   surface back into the distributable fails the build.
+
+   **PQDriverless.tests.mez** carries the same readers plus every fixture from
+   each reader's `test/` folder embedded as a resource named `<reader>.<file>`,
+   and is what the test and perf harnesses run against. `Extension.Contents`
+   only exists inside the module, so this build *also* defines an anonymous
+   data source function `PQDriverless.Fixture(optional name)` that serves the
+   embedded fixtures to test queries (`PQDriverless.Fixture("dbf.vfp.dbf")`);
+   the parameter is optional so the data source path stays constant and one
+   anonymous credential covers everything. That accessor is the reason the two
+   section documents differ, and the reason the distributable is built
+   separately: shipped, it would be a user-visible function that always fails.
+
+   `-Version <x.y.z>` stamps the section document's `[Version]` attribute. It
+   defaults to `0.0.0`; the release workflow passes the git tag, so only a
+   tagged build claims a real version.
 2. `queries/<reader>/<name>.query.pq` are the tests. Each is a single M
    expression. Navigation-table readers are dumped via `Table.ToRecords` per
    entry (full-content check) or `Table.RowCount` (stress fixtures); direct
    readers return their table as-is.
-3. `run-tests.ps1` runs each query through `PQTest.exe compare -e <mez> -q <query>`,
-   times it, and writes `out/report.md` + `out/report.json` (also appended to
-   the GitHub job summary). Expected outputs live next to each query as
-   `<name>.query.pqout`.
+3. `run-tests.ps1` load-checks **both** packages with `PQTest.exe info` before
+   anything else - the distributable has no queries run against it, so this is
+   the only thing that proves the shipped build compiles and loads - then runs
+   each query through `PQTest.exe compare -e <mez> -q <query>`, times it, and
+   writes `out/report.md` + `out/report.json` (also appended to the GitHub job
+   summary). Expected outputs live next to each query as `<name>.query.pqout`.
 4. `perf/` holds the benchmark: `make_perf_fixtures.py` generates one large
    fixture per random-access reader (stdlib-only; row counts are CLI args,
    the sqlite/dbf ones are workflow inputs), and `perf/queries/*` are
@@ -76,7 +91,7 @@ pwsh tests/run-tests.ps1
   PR comment (that turns the perf report into a regression gate).
 - Move to the DataConnectors `RunPQSDKTestSuites.ps1` layout once the suite
   grows past smoke tests, and pin the SdkTools version.
-- Publish PQDriverless.mez as a release artifact; it is already a usable
-  "every reader in one connector" build.
+- ~~Publish PQDriverless.mez as a release artifact~~ - done: a `vX.Y.Z` tag runs
+  the suite and publishes the tested mez to a GitHub release.
 - Grow per-reader coverage from one or two smoke queries to the full fixture
   matrix (mechanical: add a `.query.pq`, run once, commit the `.pqout`).
