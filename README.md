@@ -2,8 +2,6 @@
 
 **Pure Power Query M readers for binary file formats. No drivers, no installs, no admin rights.**
 
-> ⚠️ Early days. Nine readers so far (SQLite 3, GeoPackage, MBTiles, Access, dBASE/FoxPro, EVTX, MATLAB `.mat`, legacy Excel .xls, Excel Binary .xlsb). This README is a placeholder and will grow as more land.
-
 ## Why this exists
 
 In Power BI, the answer to "how do I read this file?" too often starts with "first, install this driver."
