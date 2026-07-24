@@ -48,6 +48,49 @@ def make_sqlite(path: str, rows: int) -> None:
     con.close()
 
 
+def make_sqlite_intheavy(path: str, rows: int) -> None:
+    """SQLite fixture whose INTEGER columns force every signed serial type
+    1..6, the exact path Sqlite3.DecodeValue's hoisted BinaryFormat readers
+    replaced (e3350e5). The default bulk.db never hits these: its integers are
+    a rowid (id) and 0/1 (flag, serial types 8/9), so the change was untestable
+    there. Each column's values are chosen to require exactly its target width;
+    signs are mixed so the sign-extension branches run. Column c6 sits in the
+    8-byte serial type but below 2^53 so it stays exactly representable as an M
+    double, keeping the value-checksum a clean old-vs-new correctness gate.
+
+        c1  serial type 1 (1 byte, signed)  ~ [100, 126]
+        c2  serial type 2 (2 byte, signed)  ~ -[20000, 25000]
+        c3  serial type 3 (3 byte)          ~ 1e6      (65536 .. 8388607)
+        c4  serial type 4 (4 byte, signed)  ~ -1e9     (> 2^23 magnitude)
+        c5  serial type 5 (6 byte)          ~ 1e12     (2^32 .. 2^47)
+        c6  serial type 6 (8 byte)          ~ 5e15     (2^47 .. 2^53)
+    """
+    if os.path.exists(path):
+        os.remove(path)
+    con = sqlite3.connect(path)
+    con.execute(
+        "CREATE TABLE data (id INTEGER PRIMARY KEY, "
+        "c1 INTEGER, c2 INTEGER, c3 INTEGER, c4 INTEGER, c5 INTEGER, c6 INTEGER)"
+    )
+    con.executemany(
+        "INSERT INTO data VALUES (?,?,?,?,?,?,?)",
+        (
+            (
+                i,
+                100 + (i % 27),                       # st1
+                -(20000 + (i % 5000)),                # st2
+                1_000_000 + (i % 100_000),            # st3
+                -(1_000_000_000 + (i % 1_000_000)),   # st4
+                1_000_000_000_000 + (i % 100_000),    # st5
+                5_000_000_000_000_000 + (i % 1_000_000),  # st6, < 2^53
+            )
+            for i in range(rows)
+        ),
+    )
+    con.commit()
+    con.close()
+
+
 # ---------------------------------------------------------------- dbf
 
 def make_dbf(path: str, rows: int) -> None:
@@ -567,6 +610,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=os.path.join(HERE, "out"))
     ap.add_argument("--sqlite-rows", type=int, default=1_000_000)
+    ap.add_argument("--intheavy-rows", type=int, default=300_000)
     ap.add_argument("--dbf-rows", type=int, default=20_000)
     ap.add_argument("--stata-rows", type=int, default=50_000)
     ap.add_argument("--spss-rows", type=int, default=40_000)
@@ -582,6 +626,7 @@ def main() -> None:
     os.makedirs(args.out, exist_ok=True)
     jobs = [
         ("bulk.db", make_sqlite, args.sqlite_rows),
+        ("bulk-int.db", make_sqlite_intheavy, args.intheavy_rows),
         ("bulk.dbf", make_dbf, args.dbf_rows),
         ("bulk.dta", make_stata, args.stata_rows),
         ("bulk.sav", make_spss, args.spss_rows),

@@ -2,8 +2,6 @@
 
 **Pure Power Query M readers for binary file formats. No drivers, no installs, no admin rights.**
 
-> ⚠️ Early days. Nine readers so far (SQLite 3, GeoPackage, MBTiles, Access, dBASE/FoxPro, EVTX, MATLAB `.mat`, legacy Excel .xls, Excel Binary .xlsb). This README is a placeholder and will grow as more land.
-
 ## Why this exists
 
 In Power BI, the answer to "how do I read this file?" too often starts with "first, install this driver."
@@ -100,6 +98,28 @@ These are what make the paste-and-go promise hold:
 
 - **Zero dependencies.** Standard library M only. No custom connector, no external assemblies, no ODBC.
 - **One file, one function.** Each reader is a single self-contained `.pq`. No cross-file references — deliberately non-DRY, because the paste is the product. The one exception: readers for formats that *are* SQLite databases (GeoPackage, MBTiles) call `Sqlite3.Database` as a second pasted query instead of embedding the whole b-tree parser, so SQLite bugfixes land in one place.
+
+## Performance — what to expect
+
+Decoding in interpreted M is slower than a compiled driver. That is the price of
+having no driver, and how much it costs depends almost entirely on file size:
+
+- **Small and typical files** — the size most ad-hoc imports actually are — the
+  gap is usually sub-second and often invisible. A native ODBC driver spends
+  roughly a second just standing up its connection, which swamps the decode
+  either way. Against the ACE Excel / Access / dBASE drivers the pure-M readers
+  land between parity and a few times slower, and the dBASE reader is a dead heat.
+- **Large files** — native decoders pull ahead as per-row cost takes over:
+  about **2–15x** against ODBC drivers (SQLite, ACE), and more against mature
+  compiled libraries — up to a couple of hundred× for the Rust- and GDAL-backed
+  formats (EVTX, GeoPackage) that have no ODBC driver to compare against at all.
+
+So choose by size and setting, not a single headline number. For a one-off or
+modest file the driverless reader is the easy call — nothing to install, and it
+runs in the Service where a driver cannot. For repeated decode of large files on
+a machine that *can* carry the toolchain, a native driver or library is the
+faster tool. Full method, per-format numbers, and both scales are in
+[`tests/perf/REPORT.md`](tests/perf/REPORT.md).
 
 ## Licence
 

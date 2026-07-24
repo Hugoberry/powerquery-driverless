@@ -1,0 +1,20 @@
+{
+  "tag": "old",
+  "mez": "C:\\Users\\igor\\AppData\\Local\\Temp\\claude\\C--git-powerquery-driverless\\773be30f-8d67-4201-8f13-0673f4ce6ae4\\scratchpad\\PQDriverless.old.tests.mez",
+  "timestamp": "2026-07-24T13:07:30+01:00",
+  "runs": 5,
+  "overheadMs": 3014.0,
+  "decode": {
+    "runsMs": [
+      31842.0,
+      31950.0,
+      31864.0,
+      31772.0,
+      31716.0
+    ],
+    "medianMs": 31842.0,
+    "evalMs": 28828.0,
+    "value": "2100000"
+  },
+  "checksumValue": "23283749964"
+}

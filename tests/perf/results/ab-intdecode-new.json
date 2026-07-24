@@ -1,0 +1,20 @@
+{
+  "tag": "new",
+  "mez": "tests/out/PQDriverless.tests.mez",
+  "timestamp": "2026-07-24T12:59:17+01:00",
+  "runs": 5,
+  "overheadMs": 2468.0,
+  "decode": {
+    "runsMs": [
+      27920.0,
+      27767.0,
+      28252.0,
+      28779.0,
+      28411.0
+    ],
+    "medianMs": 28252.0,
+    "evalMs": 25784.0,
+    "value": "2100000"
+  },
+  "checksumValue": "23283749964"
+}
