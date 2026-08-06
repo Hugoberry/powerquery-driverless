@@ -43,6 +43,9 @@ let
 
     UInt16BEFormat = BinaryFormat.ByteOrder(BinaryFormat.UnsignedInteger16, ByteOrder.BigEndian),
     UInt32BEFormat = BinaryFormat.ByteOrder(BinaryFormat.UnsignedInteger32, ByteOrder.BigEndian),
+    // a contiguous run of big-endian u16 (the cell pointer array) is a sequential
+    // structure: one slice plus one list format beats n separate slice+parse calls
+    UInt16BEListFormat = (n as number) as function => BinaryFormat.List(UInt16BEFormat, n),
 
     // Signed big-endian formats hoisted once; dispatched per cell for serial types
     // 2/4/6. Unlike the old accumulate-to-double path these decode the full 64-bit
@@ -65,7 +68,6 @@ let
     Byte = (off as number) as number => ReadByte(bin, off),
     UInt2 = (off as number) as number => UInt16BEFormat(Binary.Range(bin, off, 2)),
     UInt4 = (off as number) as number => UInt32BEFormat(Binary.Range(bin, off, 4)),
-    Float64BE = (b as binary) as number => Float64BEFormat(b),
     VarintAt = (b as binary, offset as number) as record =>
         let f = (o as number, v as number, n as number) as record =>
                 let by = ReadByte(b, o)
@@ -76,15 +78,35 @@ let
             f(offset, 0, 0),
 
     //==================== file header ====================
-    Magic = Text.FromBinary(Slice(bin, 0, 15), TextEncoding.Utf8),
+    // The 100-byte header is read once, front to back, at fixed small offsets:
+    // rule 5 in context/PERF.md — a sequential structure may stay streaming, and
+    // a hoisted BinaryFormat.Record says what the layout is instead of scattering
+    // magic offsets through the query.
+    HeaderFormat = BinaryFormat.Record([
+        Magic        = BinaryFormat.Text(15, TextEncoding.Utf8),   //  0  "SQLite format 3"
+        NulTerm      = BinaryFormat.Byte,                          // 15  \0
+        PageSizeRaw  = UInt16BEFormat,                             // 16  1 means 65536
+        WriteVersion = BinaryFormat.Byte,                          // 18  1 = journal, 2 = WAL
+        ReadVersion  = BinaryFormat.Byte,                          // 19
+        ReservedSize = BinaryFormat.Byte,                          // 20  unused bytes per page
+        Unused       = BinaryFormat.Binary(35),                    // 21  fractions, counters, sizes
+        EncodingId   = UInt32BEFormat                              // 56  1 = UTF-8, 2/3 = UTF-16
+    ]),
+    hdr = HeaderFormat(
+              if Binary.Length(bin) < 100
+              then error Error.Record("DataFormat.Error",
+                       "Not a SQLite 3 database file",
+                       "file is shorter than the 100-byte header")
+              else Binary.Range(bin, 0, 100)),
+    Magic = hdr[Magic],
     ps0   = if Magic <> "SQLite format 3"
             then error Error.Record("DataFormat.Error", "Not a SQLite 3 database file", Magic)
-            else UInt2(16),
+            else hdr[PageSizeRaw],
     PageSize   = if ps0 = 1 then 65536 else ps0,
-    WriteVer   = Byte(18),                       // 1 = rollback journal, 2 = WAL
-    Reserved   = Byte(20),
+    WriteVer   = hdr[WriteVersion],              // 1 = rollback journal, 2 = WAL
+    Reserved   = hdr[ReservedSize],
     Usable     = PageSize - Reserved,
-    EncodingId = UInt4(56),
+    EncodingId = hdr[EncodingId],
     Enc = if EncodingId = 2 then TextEncoding.Unicode            // UTF-16LE
           else if EncodingId = 3 then TextEncoding.BigEndianUnicode
           else TextEncoding.Utf8,
@@ -102,9 +124,13 @@ let
             ptype   = Byte(base),
             ncells  = UInt2(base + 3),
             hdrSize = if ptype = 5 then 12 else 8,
-            // cell pointer array: 2-byte offsets relative to start of page
-            offs = List.Transform({0 .. ncells - 1},
-                       (i) => pageOff + UInt2(base + hdrSize + i * 2)),
+            // cell pointer array: ncells contiguous 2-byte offsets relative to the
+            // start of the page — one slice, one list format, one pass
+            offs = if ncells = 0 then {}
+                   else List.Transform(
+                            UInt16BEListFormat(ncells)(
+                                Slice(bin, base + hdrSize, ncells * 2)),
+                            (p) => pageOff + p),
 
             ReadLeafCell = (o as number) as record =>
                 let
@@ -157,20 +183,38 @@ let
         else error Error.Record("DataFormat.Error",
                  "Reserved SQLite serial type " & Number.ToText(st), null),
 
+    // Serial types 0-9 are the fixed-width scalars. Indexing a hoisted list of
+    // readers dispatches in one step; the old if-chain made text and blob — the
+    // common case in most databases — fall through all ten comparisons first.
+    ScalarReaders = {
+        (p, o) => null,                                                       //  0  NULL
+        (p, o) => let u = ReadByte(p, o) in if u >= 128 then u - 256 else u,  //  1  int8
+        (p, o) => Int16BEFormat(Slice(p, o, 2)),                              //  2  int16
+        (p, o) => Int3BE(Slice(p, o, 3)),                                     //  3  int24
+        (p, o) => Int32BEFormat(Slice(p, o, 4)),                              //  4  int32
+        (p, o) => Int6BE(Slice(p, o, 6)),                                     //  5  int48
+        (p, o) => Int64BEFormat(Slice(p, o, 8)),                              //  6  int64
+        (p, o) => Float64BEFormat(Slice(p, o, 8)),                            //  7  IEEE 754
+        (p, o) => 0,                                                          //  8  constant 0
+        (p, o) => 1                                                           //  9  constant 1
+    },
+
     DecodeValue = (payload as binary, off as number, st as number) as any =>
-        if st = 0 then null
-        else if st = 8 then 0
-        else if st = 9 then 1
-        else if st = 7 then Float64BE(Slice(payload, off, 8))
-        else if st = 1 then let u = ReadByte(payload, off) in if u >= 128 then u - 256 else u
-        else if st = 2 then Int16BEFormat(Slice(payload, off, 2))
-        else if st = 4 then Int32BEFormat(Slice(payload, off, 4))
-        else if st = 6 then Int64BEFormat(Slice(payload, off, 8))
-        else if st = 3 then Int3BE(Slice(payload, off, 3))
-        else if st = 5 then Int6BE(Slice(payload, off, 6))
+        if st < 10 then ScalarReaders{st}(payload, off)
+        else if st < 12 then
+            error Error.Record("DataFormat.Error",
+                "Reserved SQLite serial type " & Number.ToText(st), null)
         else if Number.Mod(st, 2) = 0 then Slice(payload, off, SerialSize(st))       // blob
         else Text.FromBinary(Slice(payload, off, SerialSize(st)), Enc),              // text
 
+    // The `acc & {x}` appends below are O(cols^2) per row. Deliberately left that
+    // way: converting this walk to a List.Generate cursor was measured twice (2026-
+    // 07-22, and again on 2026-08-06) and regressed, because List.Generate pays two
+    // closure calls and two state-record allocations per column on every row, and
+    // returns a lazy list that then has to be buffered before the INTEGER PRIMARY
+    // KEY fixup can index it. At realistic column counts that constant factor costs
+    // more than the quadratic term it removes. Revisit only for genuinely wide
+    // tables, and only with a wide fixture to measure against.
     DecodeRecord = (payload as binary) as list =>
         let
             hv   = VarintAt(payload, 0),
